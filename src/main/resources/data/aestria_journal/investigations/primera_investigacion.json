@@ -1,0 +1,9 @@
+{
+  "id": "primera_investigacion",
+  "title": "Primera investigación",
+  "text": "Los primeros registros de Aestria todavía son incompletos.\n\nCada descubrimiento deberá quedar registrado para reconstruir la historia de la región.",
+  "category": "DISCOVERY",
+  "importance": "NORMAL",
+  "icon": "minecraft:writable_book",
+  "shareable": true
+}

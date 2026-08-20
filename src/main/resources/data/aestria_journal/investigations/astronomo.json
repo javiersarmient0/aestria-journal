@@ -1,0 +1,9 @@
+{
+  "id": "astronomo",
+  "title": "Astrónomo de Pueblo Albor",
+  "text": "Un viejo astrónomo de Pueblo Albor conserva conocimientos sobre las auroras y sus apariciones. Su nombre todavía está pendiente de confirmar.",
+  "category": "DISCOVERY",
+  "importance": "NORMAL",
+  "icon": "minecraft:writable_book",
+  "shareable": false
+}

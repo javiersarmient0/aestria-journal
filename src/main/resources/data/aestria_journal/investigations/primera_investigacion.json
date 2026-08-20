@@ -5,5 +5,5 @@
   "category": "DISCOVERY",
   "importance": "NORMAL",
   "icon": "minecraft:writable_book",
-  "shareable": true
+  "shareable": false
 }

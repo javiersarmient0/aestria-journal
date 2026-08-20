@@ -17,7 +17,8 @@ import net.minecraft.util.Identifier;
 
 /** Carga investigaciones desde data/aestria_journal/investigations/*.json. */
 public final class AestriaResearchLoader {
-    private static final String ROOT = "aestria_journal/investigations";
+    private static final String NAMESPACE = "aestria_journal";
+    private static final String ROOT = "investigations";
 
     private AestriaResearchLoader() {
     }
@@ -26,7 +27,15 @@ public final class AestriaResearchLoader {
         List<AestriaResearch> loaded = new ArrayList<>();
         Map<Identifier, Resource> resources = resourceManager.findResources(
                 ROOT,
-                identifier -> identifier.getPath().endsWith(".json")
+                identifier -> identifier.getNamespace().equals(NAMESPACE)
+                        && identifier.getPath().endsWith(".json")
+        );
+
+        DearDiaryMod.LOGGER.info(
+                "Diario de Aestria: buscando investigaciones en {}:{} ({} archivos encontrados)",
+                NAMESPACE,
+                ROOT,
+                resources.size()
         );
 
         for (Map.Entry<Identifier, Resource> resourceEntry : resources.entrySet()) {
@@ -55,8 +64,13 @@ public final class AestriaResearchLoader {
                 boolean shareable = !json.has("shareable") || json.get("shareable").getAsBoolean();
 
                 loaded.add(new AestriaResearch(id, title, text, category, importance, icon, shareable));
+                DearDiaryMod.LOGGER.info("Diario de Aestria: investigación cargada: {} - {}", id, title);
             } catch (Exception exception) {
-                DearDiaryMod.LOGGER.error("No se pudo cargar la investigación {}", resourceEntry.getKey(), exception);
+                DearDiaryMod.LOGGER.error(
+                        "No se pudo cargar la investigación {}",
+                        resourceEntry.getKey(),
+                        exception
+                );
             }
         }
 

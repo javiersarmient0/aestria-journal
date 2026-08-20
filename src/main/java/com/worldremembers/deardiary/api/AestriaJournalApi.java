@@ -8,6 +8,8 @@ import com.worldremembers.deardiary.data.PlayerDiary;
 import com.worldremembers.deardiary.research.AestriaResearch;
 import com.worldremembers.deardiary.research.AestriaResearchLoader;
 import com.worldremembers.deardiary.research.AestriaResearchRegistry;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.resource.ResourceManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -16,6 +18,7 @@ import net.minecraft.text.Text;
 /** API específica del contenido de historia/investigación de Aestria. */
 public final class AestriaJournalApi {
     private static final String EVENT_PREFIX = "aestria:investigacion/";
+    private static final String CHAPTER_PREFIX = "aestria:capitulo/";
 
     private AestriaJournalApi() {
     }
@@ -31,7 +34,12 @@ public final class AestriaJournalApi {
             return 0;
         }
 
+        String currentChapter = null;
         for (AestriaResearch research : AestriaResearchRegistry.all()) {
+            if (!research.chapterId().equals(currentChapter)) {
+                currentChapter = research.chapterId();
+                source.sendFeedback(() -> Text.literal("-- " + research.chapterTitle() + " --"), false);
+            }
             source.sendFeedback(() -> Text.literal(research.id() + " - " + research.title()), false);
         }
         return AestriaResearchRegistry.size();
@@ -68,6 +76,8 @@ public final class AestriaJournalApi {
             return true;
         }
 
+        ensureChapter(player, research);
+
         DiaryEntry entry = DiaryEntry.builder(DiaryEntryKind.AUTOMATIC, eventType, DearDiaryMod.MOD_ID)
                 .category(research.category())
                 .importance(research.importance())
@@ -82,5 +92,51 @@ public final class AestriaJournalApi {
         DearDiaryServices.storage().save(player.getUuid());
         player.sendMessage(Text.literal("§aNueva investigación desbloqueada: §f" + research.title()), false);
         return true;
+    }
+
+    private static void ensureChapter(ServerPlayerEntity player, AestriaResearch research) {
+        PlayerDiary diary = DearDiaryApi.getDiary(player);
+        String chapterEvent = CHAPTER_PREFIX + research.chapterId();
+        if (diary.hasEntryWithEventType(chapterEvent)) {
+            return;
+        }
+
+        DearDiaryApi.createChapterEntry(player, "§6" + research.chapterTitle(), "", false);
+        DiaryEntry chapter = diary.entriesView().get(diary.entriesView().size() - 1);
+        // Chapter markers are structural, not player-authored notes.
+        chapter.setFavorite(false);
+    }
+
+    /** Reordena las investigaciones ya desbloqueadas y reconstruye sus capítulos. */
+    public static int reorganizeResearches(ServerCommandSource source) {
+        if (!(source.getEntity() instanceof ServerPlayerEntity player)) {
+            source.sendError(Text.literal("Este comando solo puede usarse dentro del juego."));
+            return 0;
+        }
+
+        PlayerDiary diary = DearDiaryApi.getDiary(player);
+        List<String> unlockedIds = new ArrayList<>();
+        for (DiaryEntry entry : diary.entriesView()) {
+            if (entry.getEventType().startsWith(EVENT_PREFIX)) {
+                unlockedIds.add(entry.getEventType().substring(EVENT_PREFIX.length()));
+            }
+        }
+
+        for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
+            if (entry.getEventType().startsWith(EVENT_PREFIX) || entry.getEventType().startsWith(CHAPTER_PREFIX)) {
+                DearDiaryApi.deleteEntry(player, entry.getId());
+            }
+        }
+
+        int rebuilt = 0;
+        for (AestriaResearch research : AestriaResearchRegistry.all()) {
+            if (unlockedIds.contains(research.id()) && unlockResearch(player, research.id())) {
+                rebuilt++;
+            }
+        }
+
+        DearDiaryServices.storage().save(player.getUuid());
+        player.sendMessage(Text.literal("§aDiario de Aestria reorganizado: §f" + rebuilt + " investigaciones."), false);
+        return rebuilt;
     }
 }

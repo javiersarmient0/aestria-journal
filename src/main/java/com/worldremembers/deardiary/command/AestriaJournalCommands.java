@@ -3,6 +3,10 @@ package com.worldremembers.deardiary.command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.worldremembers.deardiary.api.AestriaJournalApi;
+import com.worldremembers.deardiary.api.DearDiaryApi;
+import com.worldremembers.deardiary.data.DiaryEntry;
+import com.worldremembers.deardiary.research.AestriaResearchRegistry;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -33,6 +37,14 @@ public final class AestriaJournalCommands {
                                         "deardiary chapter " + StringArgumentType.getString(context, "titulo")))))
                 .then(CommandManager.literal("exportar")
                         .executes(context -> execute(context.getSource(), "deardiary export markdown")))
+                .then(CommandManager.literal("investigaciones")
+                        .executes(context -> AestriaJournalApi.listResearches(context.getSource())))
+                .then(CommandManager.literal("desbloquear")
+                        .requires(AestriaJournalCommands::isOperator)
+                        .then(CommandManager.argument("id", StringArgumentType.word())
+                                .executes(context -> AestriaJournalApi.unlockResearch(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "id")))))
                 .then(CommandManager.literal("limpiar")
                         .requires(AestriaJournalCommands::isOperator)
                         .executes(context -> execute(context.getSource(), "deardiary clear_self")))
@@ -110,6 +122,7 @@ public final class AestriaJournalCommands {
             return 0;
         }
 
-        return player.getServer().getCommandManager().executeWithPrefix(source, command);
+        player.getServer().getCommandManager().executeWithPrefix(source, command);
+        return 1;
     }
 }

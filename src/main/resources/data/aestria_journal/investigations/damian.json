@@ -1,0 +1,9 @@
+{
+  "id": "damian",
+  "title": "Damian",
+  "text": "Damian es uno de los habitantes de Puerto Cerezo que puede aportar información adicional al grupo de Vértice. Su participación está vinculada a una investigación secundaria.",
+  "category": "DISCOVERY",
+  "importance": "NORMAL",
+  "icon": "minecraft:writable_book",
+  "shareable": false
+}

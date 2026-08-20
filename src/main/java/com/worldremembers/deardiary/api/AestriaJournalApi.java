@@ -2,8 +2,10 @@ package com.worldremembers.deardiary.api;
 
 import com.worldremembers.deardiary.DearDiaryMod;
 import com.worldremembers.deardiary.DearDiaryServices;
+import com.worldremembers.deardiary.data.DiaryCategory;
 import com.worldremembers.deardiary.data.DiaryEntry;
 import com.worldremembers.deardiary.data.DiaryEntryKind;
+import com.worldremembers.deardiary.data.DiaryImportance;
 import com.worldremembers.deardiary.data.PlayerDiary;
 import com.worldremembers.deardiary.research.AestriaResearch;
 import com.worldremembers.deardiary.research.AestriaResearchLoader;
@@ -50,14 +52,10 @@ public final class AestriaJournalApi {
             source.sendError(Text.literal("Este comando solo puede usarse dentro del juego."));
             return 0;
         }
-
         return unlockResearch(player, researchId) ? 1 : 0;
     }
 
-    /**
-     * Desbloquea una investigación para un jugador. Es idempotente: completar
-     * la misma misión dos veces no crea entradas duplicadas.
-     */
+    /** Desbloquea una investigación para un jugador de forma idempotente. */
     public static boolean unlockResearch(ServerPlayerEntity player, String researchId) {
         if (researchId == null || researchId.isBlank()) {
             return false;
@@ -101,10 +99,17 @@ public final class AestriaJournalApi {
             return;
         }
 
-        DearDiaryApi.createChapterEntry(player, "§6" + research.chapterTitle(), "", false);
-        DiaryEntry chapter = diary.entriesView().get(diary.entriesView().size() - 1);
-        // Chapter markers are structural, not player-authored notes.
-        chapter.setFavorite(false);
+        DiaryEntry chapter = DiaryEntry.builder(DiaryEntryKind.MANUAL, chapterEvent, DearDiaryMod.MOD_ID)
+                .category(DiaryCategory.OTHER)
+                .importance(DiaryImportance.NORMAL)
+                .resolvedTitle("§6" + research.chapterTitle())
+                .resolvedText("")
+                .icon("minecraft:writable_book")
+                .editable(false)
+                .shareable(false)
+                .build();
+
+        DearDiaryApi.addEntry(player, chapter);
     }
 
     /** Reordena las investigaciones ya desbloqueadas y reconstruye sus capítulos. */

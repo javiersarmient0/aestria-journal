@@ -1,0 +1,9 @@
+{
+  "id": "profesor_oak",
+  "title": "Profesor Oak",
+  "text": "El Profesor Oak trabaja en su laboratorio de Pueblo Albor. Sus investigaciones pueden ayudar al grupo de Vértice a comprender los fenómenos que afectan a Aestria y a sus Pokémon.",
+  "category": "DISCOVERY",
+  "importance": "NORMAL",
+  "icon": "minecraft:writable_book",
+  "shareable": false
+}

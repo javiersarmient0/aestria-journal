@@ -4,16 +4,13 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.worldremembers.deardiary.api.AestriaJournalApi;
-import com.worldremembers.deardiary.api.DearDiaryApi;
-import com.worldremembers.deardiary.data.DiaryEntry;
-import com.worldremembers.deardiary.research.AestriaResearchRegistry;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 
-/** Comandos en español para el Diario de Aestria. */
+/** Comandos públicos y de administración para el Diario de Aestria. */
 public final class AestriaJournalCommands {
     private AestriaJournalCommands() {
     }
@@ -40,11 +37,23 @@ public final class AestriaJournalCommands {
                 .then(CommandManager.literal("investigaciones")
                         .executes(context -> AestriaJournalApi.listResearches(context.getSource())))
                 .then(CommandManager.literal("desbloquear")
-                        .requires(AestriaJournalCommands::isOperator)
                         .then(CommandManager.argument("id", StringArgumentType.word())
                                 .executes(context -> AestriaJournalApi.unlockResearch(
                                         context.getSource(),
                                         StringArgumentType.getString(context, "id")))))
+                .then(CommandManager.literal("recargar_investigaciones")
+                        .requires(AestriaJournalCommands::isOperator)
+                        .executes(context -> {
+                            if (context.getSource().getServer() == null) {
+                                return 0;
+                            }
+                            AestriaJournalApi.reloadResearches(context.getSource().getServer().getResourceManager());
+                            context.getSource().sendFeedback(
+                                    () -> Text.literal("Investigaciones de Aestria recargadas."),
+                                    false
+                            );
+                            return 1;
+                        }))
                 .then(CommandManager.literal("limpiar")
                         .requires(AestriaJournalCommands::isOperator)
                         .executes(context -> execute(context.getSource(), "deardiary clear_self")))

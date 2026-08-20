@@ -41,6 +41,9 @@ public final class AestriaJournalCommands {
                                 .executes(context -> AestriaJournalApi.unlockResearch(
                                         context.getSource(),
                                         StringArgumentType.getString(context, "id")))))
+                .then(CommandManager.literal("reorganizar")
+                        .requires(AestriaJournalCommands::isOperator)
+                        .executes(context -> AestriaJournalApi.reorganizeResearches(context.getSource())))
                 .then(CommandManager.literal("recargar_investigaciones")
                         .requires(AestriaJournalCommands::isOperator)
                         .executes(context -> {

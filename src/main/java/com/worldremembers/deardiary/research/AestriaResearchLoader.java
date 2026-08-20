@@ -48,8 +48,6 @@ public final class AestriaResearchLoader {
                 String id = json.get("id").getAsString();
                 String title = json.get("title").getAsString();
                 String text = json.get("text").getAsString();
-                String chapterId = json.has("chapter_id") ? json.get("chapter_id").getAsString() : "general";
-                String chapterTitle = json.has("chapter_title") ? json.get("chapter_title").getAsString() : "Investigaciones";
 
                 DiaryCategory category = json.has("category")
                         ? DiaryCategory.valueOf(json.get("category").getAsString().toUpperCase())
@@ -65,11 +63,21 @@ public final class AestriaResearchLoader {
 
                 boolean shareable = !json.has("shareable") || json.get("shareable").getAsBoolean();
 
+                String chapterId = json.has("chapter_id")
+                        ? json.get("chapter_id").getAsString()
+                        : defaultChapterId(id);
+                String chapterTitle = json.has("chapter_title")
+                        ? json.get("chapter_title").getAsString()
+                        : defaultChapterTitle(chapterId);
+
                 loaded.add(new AestriaResearch(
                         id, title, text, category, importance, icon,
                         chapterId, chapterTitle, shareable
                 ));
-                DearDiaryMod.LOGGER.info("Diario de Aestria: investigación cargada: {} - {} ({})", id, title, chapterTitle);
+                DearDiaryMod.LOGGER.info(
+                        "Diario de Aestria: investigación cargada: {} - {} ({})",
+                        id, title, chapterTitle
+                );
             } catch (Exception exception) {
                 DearDiaryMod.LOGGER.error(
                         "No se pudo cargar la investigación {}",
@@ -81,5 +89,21 @@ public final class AestriaResearchLoader {
 
         AestriaResearchRegistry.replaceAll(loaded);
         DearDiaryMod.LOGGER.info("Diario de Aestria: {} investigaciones cargadas", loaded.size());
+    }
+
+    private static String defaultChapterId(String researchId) {
+        return switch (researchId) {
+            case "capitan_jones", "damian", "marinero_elias" -> "puerto_cerezo";
+            case "tomas", "astronomo", "profesor_oak", "cultivos_auroras", "primera_investigacion" -> "pueblo_albor";
+            default -> "general";
+        };
+    }
+
+    private static String defaultChapterTitle(String chapterId) {
+        return switch (chapterId) {
+            case "puerto_cerezo" -> "Puerto Cerezo";
+            case "pueblo_albor" -> "Pueblo Albor";
+            default -> "Investigaciones";
+        };
     }
 }

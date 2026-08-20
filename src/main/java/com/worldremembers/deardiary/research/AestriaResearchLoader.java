@@ -48,6 +48,8 @@ public final class AestriaResearchLoader {
                 String id = json.get("id").getAsString();
                 String title = json.get("title").getAsString();
                 String text = json.get("text").getAsString();
+                String chapterId = json.has("chapter_id") ? json.get("chapter_id").getAsString() : "general";
+                String chapterTitle = json.has("chapter_title") ? json.get("chapter_title").getAsString() : "Investigaciones";
 
                 DiaryCategory category = json.has("category")
                         ? DiaryCategory.valueOf(json.get("category").getAsString().toUpperCase())
@@ -63,8 +65,11 @@ public final class AestriaResearchLoader {
 
                 boolean shareable = !json.has("shareable") || json.get("shareable").getAsBoolean();
 
-                loaded.add(new AestriaResearch(id, title, text, category, importance, icon, shareable));
-                DearDiaryMod.LOGGER.info("Diario de Aestria: investigación cargada: {} - {}", id, title);
+                loaded.add(new AestriaResearch(
+                        id, title, text, category, importance, icon,
+                        chapterId, chapterTitle, shareable
+                ));
+                DearDiaryMod.LOGGER.info("Diario de Aestria: investigación cargada: {} - {} ({})", id, title, chapterTitle);
             } catch (Exception exception) {
                 DearDiaryMod.LOGGER.error(
                         "No se pudo cargar la investigación {}",

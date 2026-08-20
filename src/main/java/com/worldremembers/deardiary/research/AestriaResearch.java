@@ -11,6 +11,8 @@ public record AestriaResearch(
         DiaryCategory category,
         DiaryImportance importance,
         String icon,
+        String chapterId,
+        String chapterTitle,
         boolean shareable
 ) {
 }

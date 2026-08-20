@@ -1,6 +1,7 @@
 package com.worldremembers.deardiary;
 
 import com.worldremembers.deardiary.command.DearDiaryCommands;
+import com.worldremembers.deardiary.command.AestriaJournalCommands;
 import com.worldremembers.deardiary.compat.fabric.FabricCompatBootstrap;
 import com.worldremembers.deardiary.config.DearDiaryConfigManager;
 import com.worldremembers.deardiary.data.DiaryEntry;
@@ -27,7 +28,7 @@ import org.slf4j.LoggerFactory;
 
 public final class DearDiaryMod implements ModInitializer {
     public static final String MOD_ID = "dear_diary";
-    public static final String MOD_NAME = "World Remembers: Dear Diary";
+    public static final String MOD_NAME = "Diario de Aestria";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     @Override
@@ -45,13 +46,14 @@ public final class DearDiaryMod implements ModInitializer {
         FabricCompatBootstrap.register();
         configManager.writeSupportFiles();
         DearDiaryCommands.register();
+        AestriaJournalCommands.register();
 
         ServerLifecycleEvents.SERVER_STARTING.register(server -> {
             Path worldRoot = server.getSavePath(WorldSavePath.ROOT);
             JsonDiaryStorage storage = new JsonDiaryStorage(worldRoot.resolve("data").resolve(MOD_ID).resolve("players"));
             storage.initialize();
             DearDiaryServices.setStorage(storage);
-            LOGGER.info("Dear Diary storage initialized at {}", worldRoot.resolve("data").resolve(MOD_ID));
+            LOGGER.info("Diario de Aestria storage initialized at {}", worldRoot.resolve("data").resolve(MOD_ID));
         });
 
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {

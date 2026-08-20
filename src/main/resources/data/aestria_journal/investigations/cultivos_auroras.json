@@ -1,0 +1,9 @@
+{
+  "id": "cultivos_auroras",
+  "title": "Los cultivos y las auroras",
+  "text": "Tomás recuerda que cuando las auroras aparecían durante varias noches seguidas los cultivos crecían con mayor fuerza.\n\nTodavía no existen pruebas científicas.",
+  "category": "DISCOVERY",
+  "importance": "NORMAL",
+  "icon": "minecraft:writable_book",
+  "shareable": true
+}

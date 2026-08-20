@@ -1,0 +1,9 @@
+{
+  "id": "tomas",
+  "title": "Tomás",
+  "text": "Tomás es el granjero de Pueblo Albor. Sus observaciones sobre los cultivos pueden aportar información importante para comprender la relación entre las auroras y el comportamiento de la región.",
+  "category": "DISCOVERY",
+  "importance": "NORMAL",
+  "icon": "minecraft:writable_book",
+  "shareable": false
+}

@@ -1,0 +1,9 @@
+{
+  "id": "marinero_elias",
+  "title": "Marinero Elias",
+  "text": "El Marinero Elias forma parte de los primeros contactos del grupo de Vértice en Puerto Cerezo. Su misión secundaria puede aportar nueva información para la investigación.",
+  "category": "DISCOVERY",
+  "importance": "NORMAL",
+  "icon": "minecraft:writable_book",
+  "shareable": false
+}

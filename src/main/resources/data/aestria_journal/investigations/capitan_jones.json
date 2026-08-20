@@ -1,0 +1,9 @@
+{
+  "id": "capitan_jones",
+  "title": "Capitán Jones",
+  "text": "El Capitán Jones es el primer contacto del grupo de Vértice al llegar a Aestria. Su función es recibir a los investigadores y orientarlos durante su llegada a Puerto Cerezo.",
+  "category": "BEGINNING",
+  "importance": "NORMAL",
+  "icon": "minecraft:writable_book",
+  "shareable": false
+}

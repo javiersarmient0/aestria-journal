@@ -8,7 +8,6 @@ public final class DearDiaryClientMod implements ClientModInitializer {
         DiaryNotificationManager.register();
         DearDiaryClientNetworking.register();
         DearDiaryKeybindings.register();
-        DearDiaryClientCommands.register();
         DearDiaryInventoryButton.register();
     }
 }

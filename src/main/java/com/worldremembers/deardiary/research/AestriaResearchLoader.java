@@ -5,12 +5,15 @@ import com.google.gson.JsonParser;
 import com.worldremembers.deardiary.DearDiaryMod;
 import com.worldremembers.deardiary.data.DiaryCategory;
 import com.worldremembers.deardiary.data.DiaryImportance;
+import java.io.InputStreamReader;
 import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.resource.Resource;
 import net.minecraft.resource.ResourceManager;
+import net.minecraft.util.Identifier;
 
 /** Carga investigaciones desde data/aestria_journal/investigations/*.json. */
 public final class AestriaResearchLoader {
@@ -21,13 +24,16 @@ public final class AestriaResearchLoader {
 
     public static void reload(ResourceManager resourceManager) {
         List<AestriaResearch> loaded = new ArrayList<>();
-        Map<net.minecraft.util.Identifier, Resource> resources = resourceManager.findResources(
+        Map<Identifier, Resource> resources = resourceManager.findResources(
                 ROOT,
                 identifier -> identifier.getPath().endsWith(".json")
         );
 
-        for (Map.Entry<net.minecraft.util.Identifier, Resource> resourceEntry : resources.entrySet()) {
-            try (Reader reader = resourceEntry.getValue().getReader()) {
+        for (Map.Entry<Identifier, Resource> resourceEntry : resources.entrySet()) {
+            try (Reader reader = new InputStreamReader(
+                    resourceEntry.getValue().getInputStream(),
+                    StandardCharsets.UTF_8
+            )) {
                 JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
 
                 String id = json.get("id").getAsString();

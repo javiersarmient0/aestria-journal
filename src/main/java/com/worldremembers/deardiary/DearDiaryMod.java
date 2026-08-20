@@ -9,6 +9,7 @@ import com.worldremembers.deardiary.data.PlayerDiary;
 import com.worldremembers.deardiary.event.OriginEntryFactory;
 import com.worldremembers.deardiary.event.VanillaDiaryEvents;
 import com.worldremembers.deardiary.api.DearDiaryApi;
+import com.worldremembers.deardiary.api.AestriaJournalApi;
 import com.worldremembers.deardiary.network.DearDiaryNetworking;
 import com.worldremembers.deardiary.storage.DiaryBackupManager;
 import com.worldremembers.deardiary.storage.JsonDiaryStorage;
@@ -53,6 +54,7 @@ public final class DearDiaryMod implements ModInitializer {
             JsonDiaryStorage storage = new JsonDiaryStorage(worldRoot.resolve("data").resolve(MOD_ID).resolve("players"));
             storage.initialize();
             DearDiaryServices.setStorage(storage);
+            AestriaJournalApi.reloadResearches(server.getResourceManager());
             LOGGER.info("Diario de Aestria storage initialized at {}", worldRoot.resolve("data").resolve(MOD_ID));
         });
 

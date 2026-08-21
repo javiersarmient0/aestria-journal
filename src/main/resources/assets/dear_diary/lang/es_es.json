@@ -56,7 +56,7 @@
   "screen.dear_diary.untitled": "Nota sin título",
   "key.categories.dear_diary": "Diario de Aestria",
   "key.dear_diary.open_new_entry": "Abrir nueva entrada del diario",
-  "notification.dear_diary.new_entry": "Nueva entrada en el diario",
+  "notification.dear_diary.new_entry": "Nueva entrada",
   "commands.dear_diary.open.success": "Diario de Aestria abierto.",
   "commands.dear_diary.open.unavailable": "El cliente no está listo para abrir el Diario de Aestria.",
   "commands.dear_diary.client.not_in_world": "El Diario de Aestria solo puede abrirse dentro de un mundo.",

@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import net.minecraft.resource.ResourceManager;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
@@ -27,6 +28,43 @@ public final class AestriaJournalApi {
     }
 
     public static void reloadResearches(ResourceManager resourceManager) { AestriaResearchLoader.reload(resourceManager); }
+
+    /** Recarga los JSON editables y sincroniza el contenido de entradas ya desbloqueadas. */
+    public static int reloadResearches(MinecraftServer server) {
+        AestriaResearchLoader.reload(server.getResourceManager());
+        int updated = 0;
+        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+            PlayerDiary diary = DearDiaryApi.getDiary(player);
+            Set<String> chaptersToRefresh = new HashSet<>();
+            boolean changed = false;
+
+            for (DiaryEntry entry : diary.entriesView()) {
+                String eventType = entry.getEventType();
+                if (eventType == null || !eventType.startsWith(EVENT_PREFIX)) continue;
+                String researchId = eventType.substring(EVENT_PREFIX.length());
+                AestriaResearch research = AestriaResearchRegistry.get(researchId).orElse(null);
+                if (research == null) continue;
+
+                if (entry.isEditable()) {
+                    entry.updateResolvedText(research.title(), research.text());
+                    changed = true;
+                    updated++;
+                }
+                chaptersToRefresh.add(research.chapterTitle());
+            }
+
+            for (String chapterTitle : chaptersToRefresh) {
+                refreshChapterMarker(player, chapterTitle);
+                changed = true;
+            }
+
+            if (changed) {
+                DearDiaryServices.storage().save(player.getUuid());
+                DearDiaryNetworking.sendDiarySnapshot(player);
+            }
+        }
+        return updated;
+    }
 
     public static int listResearches(ServerCommandSource source) {
         source.sendFeedback(() -> Text.literal("=== Investigaciones de Aestria ==="), false);
@@ -76,6 +114,8 @@ public final class AestriaJournalApi {
                     .resolvedTitle(research.title()).resolvedText(research.text()).icon(research.icon())
                     .editable(true).shareable(false).build();
             entry = DearDiaryApi.addEntry(player, entry);
+        } else if (existing.isEditable()) {
+            existing.updateResolvedText(research.title(), research.text());
         }
         refreshChapterMarker(player, research.chapterTitle());
         DearDiaryServices.storage().save(player.getUuid());
@@ -84,7 +124,7 @@ public final class AestriaJournalApi {
             DearDiaryNetworking.sendResearchEntryNotice(player, entry);
             player.sendMessage(Text.literal("§aNueva investigación desbloqueada: §f" + research.title()), false);
         } else {
-            player.sendMessage(Text.literal("§eInvestigación ya desbloqueada; capítulo reorganizado: §f" + research.title()), false);
+            player.sendMessage(Text.literal("§eInvestigación ya desbloqueada; contenido y capítulo actualizados: §f" + research.title()), false);
         }
         return true;
     }
@@ -144,7 +184,6 @@ public final class AestriaJournalApi {
         return removed;
     }
 
-    /** Elimina directamente un separador de capítulo, incluso si es una entrada heredada. */
     public static int deleteChapter(ServerCommandSource source, String chapterTitle, ServerPlayerEntity target) {
         int removed = deleteChapterInternal(target, chapterTitle);
         DearDiaryServices.storage().save(target.getUuid());
@@ -159,7 +198,7 @@ public final class AestriaJournalApi {
         int removed = 0;
         for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
             boolean chapterMatch = DearDiaryApi.isChapterEntry(entry) && chapterTitle.equals(entry.getResolvedTitle());
-            boolean legacyMatch = (entry.getEventType() != null && entry.getEventType().equals(LEGACY_CHAPTER_PREFIX + chapterTitle));
+            boolean legacyMatch = entry.getEventType() != null && entry.getEventType().equals(LEGACY_CHAPTER_PREFIX + chapterTitle);
             if (chapterMatch || legacyMatch) {
                 boolean deleted = DearDiaryApi.deleteEntry(target, entry.getId());
                 if (!deleted) deleted = diary.removeEntry(entry.getId());
@@ -180,9 +219,10 @@ public final class AestriaJournalApi {
         PlayerDiary diary = DearDiaryApi.getDiary(player);
         int removed = 0;
         for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
-            boolean aestriaResearch = entry.getEventType().startsWith(EVENT_PREFIX)
+            boolean eventType = entry.getEventType() != null;
+            boolean aestriaResearch = eventType && entry.getEventType().startsWith(EVENT_PREFIX)
                     || (researchTitles.contains(entry.getResolvedTitle()) && researchTexts.contains(entry.getResolvedText()));
-            boolean legacyAestriaChapter = entry.getEventType().startsWith(LEGACY_CHAPTER_PREFIX);
+            boolean legacyAestriaChapter = eventType && entry.getEventType().startsWith(LEGACY_CHAPTER_PREFIX);
             boolean aestriaChapter = DearDiaryApi.isChapterEntry(entry) && chapterTitles.contains(entry.getResolvedTitle());
             if (aestriaResearch || legacyAestriaChapter || aestriaChapter) {
                 boolean deleted = DearDiaryApi.deleteEntry(player, entry.getId());
@@ -204,7 +244,7 @@ public final class AestriaJournalApi {
         List<String> unlockedIds = new ArrayList<>();
         for (DiaryEntry entry : diary.entriesView()) {
             String eventType = entry.getEventType();
-            if (eventType.startsWith(EVENT_PREFIX)) {
+            if (eventType != null && eventType.startsWith(EVENT_PREFIX)) {
                 unlockedIds.add(eventType.substring(EVENT_PREFIX.length())); continue;
             }
             for (AestriaResearch research : AestriaResearchRegistry.all()) {

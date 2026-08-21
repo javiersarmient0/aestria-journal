@@ -65,6 +65,11 @@ public final class JsonDiaryStorage implements DiaryStorage {
 
     @Override
     public synchronized boolean deleteEntry(UUID playerUuid, UUID entryId) {
+        Optional<DiaryEntry> entry = getDiary(playerUuid).findEntry(entryId);
+        if (entry.isEmpty() || !entry.get().isEditable()) {
+            return false;
+        }
+
         boolean removed = getDiary(playerUuid).removeEntry(entryId);
         if (removed) {
             save(playerUuid);

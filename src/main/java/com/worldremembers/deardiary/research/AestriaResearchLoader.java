@@ -101,8 +101,8 @@ public final class AestriaResearchLoader {
 
     private static String defaultChapterTitle(String chapterId) {
         return switch (chapterId) {
-            case "puerto_cerezo" -> "Puerto Cerezo";
-            case "pueblo_albor" -> "Pueblo Albor";
+            case "puerto_cerezo" -> "Capítulo 1 · Puerto Cerezo";
+            case "pueblo_albor" -> "Capítulo 2 · Pueblo Albor";
             default -> "Investigaciones";
         };
     }

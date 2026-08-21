@@ -10,7 +10,9 @@ import com.worldremembers.deardiary.research.AestriaResearch;
 import com.worldremembers.deardiary.research.AestriaResearchLoader;
 import com.worldremembers.deardiary.research.AestriaResearchRegistry;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import net.minecraft.resource.ResourceManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -73,6 +75,8 @@ public final class AestriaJournalApi {
             return true;
         }
 
+        // Dear Diary renders a chapter as a timeline separator. It must be
+        // inserted BEFORE the first research entry belonging to that chapter.
         ensureChapter(player, research);
 
         DiaryEntry entry = DiaryEntry.builder(DiaryEntryKind.AUTOMATIC, eventType, DearDiaryMod.MOD_ID)
@@ -81,41 +85,68 @@ public final class AestriaJournalApi {
                 .resolvedTitle(research.title())
                 .resolvedText(research.text())
                 .icon(research.icon())
-                .editable(false)
+                // Enabled temporarily during development so entries can be
+                // removed/retested repeatedly. Final release will disable it.
+                .editable(true)
                 .shareable(false)
                 .build();
 
         DearDiaryApi.addEntry(player, entry);
         DearDiaryServices.storage().save(player.getUuid());
-
-        // Refresh the client before showing the notification so the new
-        // investigation is already present when the player opens the diary.
         DearDiaryNetworking.sendDiarySnapshot(player);
         DearDiaryNetworking.sendResearchEntryNotice(player, entry);
         player.sendMessage(Text.literal("§aNueva investigación desbloqueada: §f" + research.title()), false);
         return true;
     }
 
-    /**
-     * Creates a chapter using Dear Diary's own public chapter API. This is
-     * important because the client recognizes chapters by the native marker
-     * and renders them as separators instead of normal yellow entries.
-     */
+    /** Creates a real Dear Diary chapter before its first investigation. */
     private static void ensureChapter(ServerPlayerEntity player, AestriaResearch research) {
         PlayerDiary diary = DearDiaryApi.getDiary(player);
         String chapterTitle = research.chapterTitle();
 
         boolean chapterExists = diary.entriesView().stream().anyMatch(entry ->
-                DearDiaryApi.isChapterEntry(entry)
-                        && chapterTitle.equals(entry.getResolvedTitle())
+                DearDiaryApi.isChapterEntry(entry) && chapterTitle.equals(entry.getResolvedTitle())
         );
         if (chapterExists) {
             return;
         }
 
-        // Use the same creation path as the normal Dear Diary "new chapter"
-        // UI. This guarantees the exact same event type and metadata.
         DearDiaryApi.createChapterEntry(player, chapterTitle, "", false);
+    }
+
+    /**
+     * Development reset: removes only Aestria investigations and Aestria
+     * chapter markers. Personal notes and unrelated Dear Diary entries remain.
+     */
+    public static int resetAestriaDiary(ServerCommandSource source) {
+        if (!(source.getEntity() instanceof ServerPlayerEntity player)) {
+            source.sendError(Text.literal("Este comando solo puede usarse dentro del juego."));
+            return 0;
+        }
+
+        Set<String> chapterTitles = new HashSet<>();
+        for (AestriaResearch research : AestriaResearchRegistry.all()) {
+            chapterTitles.add(research.chapterTitle());
+        }
+
+        PlayerDiary diary = DearDiaryApi.getDiary(player);
+        int removed = 0;
+        for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
+            boolean aestriaResearch = entry.getEventType().startsWith(EVENT_PREFIX);
+            boolean legacyAestriaChapter = entry.getEventType().startsWith(LEGACY_CHAPTER_PREFIX);
+            boolean aestriaChapter = DearDiaryApi.isChapterEntry(entry)
+                    && chapterTitles.contains(entry.getResolvedTitle());
+
+            if ((aestriaResearch || legacyAestriaChapter || aestriaChapter)
+                    && DearDiaryApi.deleteEntry(player, entry.getId())) {
+                removed++;
+            }
+        }
+
+        DearDiaryServices.storage().save(player.getUuid());
+        DearDiaryNetworking.sendDiarySnapshot(player);
+        player.sendMessage(Text.literal("§aDiario de Aestria reiniciado: §f" + removed + " elementos eliminados."), false);
+        return removed;
     }
 
     /** Reordena las investigaciones ya desbloqueadas y reconstruye sus capítulos. */
@@ -133,15 +164,7 @@ public final class AestriaJournalApi {
             }
         }
 
-        // Remove only Aestria's research data. Personal notes and any other
-        // diary content are preserved.
-        for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
-            if (entry.getEventType().startsWith(EVENT_PREFIX)
-                    || entry.getEventType().startsWith(LEGACY_CHAPTER_PREFIX)
-                    || DearDiaryApi.isChapterEntry(entry) && DearDiaryMod.MOD_ID.equals(entry.getSource())) {
-                DearDiaryApi.deleteEntry(player, entry.getId());
-            }
-        }
+        resetAestriaDiary(source);
 
         int rebuilt = 0;
         for (AestriaResearch research : AestriaResearchRegistry.all()) {

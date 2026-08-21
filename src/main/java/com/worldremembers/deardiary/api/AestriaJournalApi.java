@@ -2,11 +2,8 @@ package com.worldremembers.deardiary.api;
 
 import com.worldremembers.deardiary.DearDiaryMod;
 import com.worldremembers.deardiary.DearDiaryServices;
-import com.worldremembers.deardiary.data.DiaryCategory;
 import com.worldremembers.deardiary.data.DiaryEntry;
 import com.worldremembers.deardiary.data.DiaryEntryKind;
-import com.worldremembers.deardiary.data.DiaryEntryMarkers;
-import com.worldremembers.deardiary.data.DiaryImportance;
 import com.worldremembers.deardiary.data.PlayerDiary;
 import com.worldremembers.deardiary.network.DearDiaryNetworking;
 import com.worldremembers.deardiary.research.AestriaResearch;
@@ -85,56 +82,40 @@ public final class AestriaJournalApi {
                 .resolvedText(research.text())
                 .icon(research.icon())
                 .editable(false)
-                .shareable(research.shareable())
+                .shareable(false)
                 .build();
 
         DearDiaryApi.addEntry(player, entry);
         DearDiaryServices.storage().save(player.getUuid());
+
+        // Refresh the client before showing the notification so the new
+        // investigation is already present when the player opens the diary.
+        DearDiaryNetworking.sendDiarySnapshot(player);
         DearDiaryNetworking.sendResearchEntryNotice(player, entry);
         player.sendMessage(Text.literal("§aNueva investigación desbloqueada: §f" + research.title()), false);
         return true;
     }
 
     /**
-     * Creates a real Dear Diary chapter marker. The marker event type must be
-     * DiaryEntryMarkers.CHAPTER_EVENT_TYPE; using a custom event type makes the
-     * client render the chapter as a normal yellow diary entry instead.
+     * Creates a chapter using Dear Diary's own public chapter API. This is
+     * important because the client recognizes chapters by the native marker
+     * and renders them as separators instead of normal yellow entries.
      */
     private static void ensureChapter(ServerPlayerEntity player, AestriaResearch research) {
         PlayerDiary diary = DearDiaryApi.getDiary(player);
-        String chapterId = research.chapterId();
+        String chapterTitle = research.chapterTitle();
 
         boolean chapterExists = diary.entriesView().stream().anyMatch(entry ->
                 DearDiaryApi.isChapterEntry(entry)
-                        && research.chapterTitle().equals(stripFormatting(entry.getResolvedTitle()))
+                        && chapterTitle.equals(entry.getResolvedTitle())
         );
         if (chapterExists) {
             return;
         }
 
-        DiaryEntry chapter = DiaryEntry.builder(
-                        DiaryEntryKind.MANUAL,
-                        DiaryEntryMarkers.CHAPTER_EVENT_TYPE,
-                        DearDiaryMod.MOD_ID
-                )
-                .category(DiaryCategory.OTHER)
-                .importance(DiaryImportance.NORMAL)
-                .resolvedTitle(research.chapterTitle())
-                .resolvedText("")
-                .icon("minecraft:writable_book")
-                .editable(false)
-                .shareable(false)
-                .customData("aestria_chapter_id", new com.google.gson.JsonPrimitive(chapterId))
-                .build();
-
-        DearDiaryApi.addEntry(player, chapter);
-    }
-
-    private static String stripFormatting(String text) {
-        if (text == null) {
-            return "";
-        }
-        return text.replaceAll("§[0-9a-fk-or]", "");
+        // Use the same creation path as the normal Dear Diary "new chapter"
+        // UI. This guarantees the exact same event type and metadata.
+        DearDiaryApi.createChapterEntry(player, chapterTitle, "", false);
     }
 
     /** Reordena las investigaciones ya desbloqueadas y reconstruye sus capítulos. */
@@ -152,12 +133,12 @@ public final class AestriaJournalApi {
             }
         }
 
-        // Remove only Aestria's research data. Personal notes and Dear Diary
-        // automatic entries are preserved.
+        // Remove only Aestria's research data. Personal notes and any other
+        // diary content are preserved.
         for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
             if (entry.getEventType().startsWith(EVENT_PREFIX)
                     || entry.getEventType().startsWith(LEGACY_CHAPTER_PREFIX)
-                    || DearDiaryApi.isChapterEntry(entry) && entry.getSource().equals(DearDiaryMod.MOD_ID)) {
+                    || DearDiaryApi.isChapterEntry(entry) && DearDiaryMod.MOD_ID.equals(entry.getSource())) {
                 DearDiaryApi.deleteEntry(player, entry.getId());
             }
         }
@@ -170,6 +151,7 @@ public final class AestriaJournalApi {
         }
 
         DearDiaryServices.storage().save(player.getUuid());
+        DearDiaryNetworking.sendDiarySnapshot(player);
         player.sendMessage(Text.literal("§aDiario de Aestria reorganizado: §f" + rebuilt + " investigaciones."), false);
         return rebuilt;
     }

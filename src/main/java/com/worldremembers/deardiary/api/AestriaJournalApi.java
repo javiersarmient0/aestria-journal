@@ -7,6 +7,7 @@ import com.worldremembers.deardiary.data.DiaryEntry;
 import com.worldremembers.deardiary.data.DiaryEntryKind;
 import com.worldremembers.deardiary.data.DiaryImportance;
 import com.worldremembers.deardiary.data.PlayerDiary;
+import com.worldremembers.deardiary.network.DearDiaryNetworking;
 import com.worldremembers.deardiary.research.AestriaResearch;
 import com.worldremembers.deardiary.research.AestriaResearchLoader;
 import com.worldremembers.deardiary.research.AestriaResearchRegistry;
@@ -88,6 +89,7 @@ public final class AestriaJournalApi {
 
         DearDiaryApi.addEntry(player, entry);
         DearDiaryServices.storage().save(player.getUuid());
+        DearDiaryNetworking.sendResearchEntryNotice(player, entry);
         player.sendMessage(Text.literal("§aNueva investigación desbloqueada: §f" + research.title()), false);
         return true;
     }

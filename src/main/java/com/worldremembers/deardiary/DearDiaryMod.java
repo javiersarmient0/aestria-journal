@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
 
 public final class DearDiaryMod implements ModInitializer {
     public static final String MOD_ID = "dear_diary";
-    public static final String MOD_NAME = "Diario de Aestria";
+    public static final String MOD_NAME = "Diario de Investigador";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     @Override
@@ -35,10 +35,6 @@ public final class DearDiaryMod implements ModInitializer {
         DearDiaryServices.setConfigManager(configManager);
 
         DearDiaryNetworking.register();
-        // Aestria Journal is intentionally not registering Dear Diary's
-        // automatic vanilla event hooks. The journal is populated by mission
-        // rewards through AestriaJournalApi, while players can still create
-        // their own manual notes normally.
         FabricCompatBootstrap.register();
         configManager.writeSupportFiles();
         DearDiaryCommands.register();
@@ -50,7 +46,7 @@ public final class DearDiaryMod implements ModInitializer {
             storage.initialize();
             DearDiaryServices.setStorage(storage);
             AestriaJournalApi.reloadResearches(server.getResourceManager());
-            LOGGER.info("Diario de Aestria storage initialized at {}", worldRoot.resolve("data").resolve(MOD_ID));
+            LOGGER.info("Diario de Investigador storage initialized at {}", worldRoot.resolve("data").resolve(MOD_ID));
         });
 
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->

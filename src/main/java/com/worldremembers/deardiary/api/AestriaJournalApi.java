@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import net.minecraft.resource.ResourceManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -58,12 +57,11 @@ public final class AestriaJournalApi {
         return unlockResearch(player, researchId) ? 1 : 0;
     }
 
-    /**
-     * Desbloquea una investigación y mantiene el marcador de capítulo como
-     * el elemento más reciente del grupo. Esto reproduce el comportamiento
-     * nativo de Dear Diary: las entradas van primero y el capítulo se crea
-     * al final como separador.
-     */
+    public static int unlockResearch(ServerCommandSource source, String researchId, ServerPlayerEntity target) {
+        return unlockResearch(target, researchId) ? 1 : 0;
+    }
+
+    /** Desbloquea una investigación para el jugador indicado. */
     public static boolean unlockResearch(ServerPlayerEntity player, String researchId) {
         if (researchId == null || researchId.isBlank()) {
             return false;
@@ -91,15 +89,10 @@ public final class AestriaJournalApi {
                     .editable(true)
                     .shareable(false)
                     .build();
-
-            DearDiaryApi.addEntry(player, entry);
+            entry = DearDiaryApi.addEntry(player, entry);
         }
 
-        // El capítulo es un separador, no un contenedor. Como Dear Diary
-        // muestra lo más reciente arriba, siempre debe recrearse DESPUÉS de
-        // las entradas del capítulo para quedar visualmente encima de ellas.
         refreshChapterMarker(player, research.chapterTitle());
-
         DearDiaryServices.storage().save(player.getUuid());
         DearDiaryNetworking.sendDiarySnapshot(player);
 
@@ -122,23 +115,78 @@ public final class AestriaJournalApi {
                 .orElse(null);
     }
 
+    private static boolean matchesResearch(DiaryEntry entry, AestriaResearch research) {
+        String eventType = EVENT_PREFIX + research.id();
+        return eventType.equals(entry.getEventType())
+                || (research.title().equals(entry.getResolvedTitle())
+                && research.text().equals(entry.getResolvedText()));
+    }
+
     private static void refreshChapterMarker(ServerPlayerEntity player, String chapterTitle) {
         PlayerDiary diary = DearDiaryApi.getDiary(player);
         for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
             if (DearDiaryApi.isChapterEntry(entry) && chapterTitle.equals(entry.getResolvedTitle())) {
-                DearDiaryApi.deleteEntry(player, entry.getId());
+                if (!DearDiaryApi.deleteEntry(player, entry.getId())) {
+                    diary.removeEntry(entry.getId());
+                }
             }
         }
-
-        // El marcador se crea al final para que quede arriba del grupo en la UI.
         DearDiaryApi.createChapterEntry(player, chapterTitle, "", false);
     }
 
-    /**
-     * Development reset. It identifica investigaciones por eventType y también
-     * por título/texto para poder limpiar entradas creadas por versiones
-     * anteriores del mod. No toca notas personales.
-     */
+    /** Borra una investigación concreta, incluyendo registros de versiones antiguas. */
+    public static int deleteResearch(ServerCommandSource source, String researchId) {
+        if (!(source.getEntity() instanceof ServerPlayerEntity player)) {
+            source.sendError(Text.literal("Este comando solo puede usarse dentro del juego."));
+            return 0;
+        }
+        return deleteResearch(source, researchId, player);
+    }
+
+    /** Borra una investigación concreta del jugador indicado. Solo se usa durante desarrollo. */
+    public static int deleteResearch(ServerCommandSource source, String researchId, ServerPlayerEntity target) {
+        AestriaResearch research = AestriaResearchRegistry.get(researchId).orElse(null);
+        if (research == null) {
+            source.sendError(Text.literal("Investigación no encontrada: " + researchId));
+            return 0;
+        }
+
+        PlayerDiary diary = DearDiaryApi.getDiary(target);
+        int removed = 0;
+        for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
+            if (matchesResearch(entry, research)) {
+                boolean deleted = DearDiaryApi.deleteEntry(target, entry.getId());
+                if (!deleted) {
+                    deleted = diary.removeEntry(entry.getId());
+                }
+                if (deleted) {
+                    removed++;
+                }
+            }
+        }
+
+        // También elimina el marcador del capítulo si ya no quedan investigaciones
+        // de Aestria pertenecientes a ese capítulo.
+        boolean chapterStillUsed = diary.entriesView().stream().anyMatch(entry ->
+                AestriaResearchRegistry.all().stream().anyMatch(other ->
+                        other.chapterTitle().equals(research.chapterTitle()) && matchesResearch(entry, other)));
+        if (!chapterStillUsed) {
+            for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
+                if (DearDiaryApi.isChapterEntry(entry) && research.chapterTitle().equals(entry.getResolvedTitle())) {
+                    if (DearDiaryApi.deleteEntry(target, entry.getId()) || diary.removeEntry(entry.getId())) {
+                        removed++;
+                    }
+                }
+            }
+        }
+
+        DearDiaryServices.storage().save(target.getUuid());
+        DearDiaryNetworking.sendDiarySnapshot(target);
+        source.sendFeedback(() -> Text.literal("§a" + research.title() + " eliminado de " + target.getName().getString() + ". Elementos eliminados: §f" + removed), false);
+        return removed;
+    }
+
+    /** Development reset. No toca notas personales. */
     public static int resetAestriaDiary(ServerCommandSource source) {
         if (!(source.getEntity() instanceof ServerPlayerEntity player)) {
             source.sendError(Text.literal("Este comando solo puede usarse dentro del juego."));
@@ -158,15 +206,16 @@ public final class AestriaJournalApi {
         int removed = 0;
         for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
             boolean aestriaResearch = entry.getEventType().startsWith(EVENT_PREFIX)
-                    || (researchTitles.contains(entry.getResolvedTitle())
-                    && researchTexts.contains(entry.getResolvedText()));
+                    || (researchTitles.contains(entry.getResolvedTitle()) && researchTexts.contains(entry.getResolvedText()));
             boolean legacyAestriaChapter = entry.getEventType().startsWith(LEGACY_CHAPTER_PREFIX);
-            boolean aestriaChapter = DearDiaryApi.isChapterEntry(entry)
-                    && chapterTitles.contains(entry.getResolvedTitle());
+            boolean aestriaChapter = DearDiaryApi.isChapterEntry(entry) && chapterTitles.contains(entry.getResolvedTitle());
 
-            if ((aestriaResearch || legacyAestriaChapter || aestriaChapter)
-                    && DearDiaryApi.deleteEntry(player, entry.getId())) {
-                removed++;
+            if (aestriaResearch || legacyAestriaChapter || aestriaChapter) {
+                boolean deleted = DearDiaryApi.deleteEntry(player, entry.getId());
+                if (!deleted) {
+                    deleted = diary.removeEntry(entry.getId());
+                }
+                if (deleted) removed++;
             }
         }
 
@@ -192,16 +241,13 @@ public final class AestriaJournalApi {
                 continue;
             }
             for (AestriaResearch research : AestriaResearchRegistry.all()) {
-                if (research.title().equals(entry.getResolvedTitle())
-                        && research.text().equals(entry.getResolvedText())) {
+                if (research.title().equals(entry.getResolvedTitle()) && research.text().equals(entry.getResolvedText())) {
                     unlockedIds.add(research.id());
                     break;
                 }
             }
         }
 
-        // Se eliminan solamente los elementos de Aestria. Las notas personales
-        // y el resto de Dear Diary permanecen intactos.
         resetAestriaDiary(source);
 
         int rebuilt = 0;

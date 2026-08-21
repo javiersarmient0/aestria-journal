@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "dear_diary",
   "version": "${version}",
-  "name": "Diario de Aestria",
-  "description": "Diario personal de Aestria con recuerdos automáticos, capítulos, notas y funciones para servidores multijugador.",
+  "name": "Diario de Investigador",
+  "description": "Diario de investigación para servidores de Minecraft, con investigaciones, capítulos y notas personales.",
   "icon": "assets/dear_diary/icon.png",
   "authors": [
     "sadeast",

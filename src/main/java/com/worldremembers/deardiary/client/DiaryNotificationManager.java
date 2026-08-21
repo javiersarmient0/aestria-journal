@@ -54,6 +54,11 @@ public final class DiaryNotificationManager {
         show(Text.translatable("notification.dear_diary.new_entry"));
     }
 
+    /** Reutiliza exactamente la misma animación que Dear Diary usa para una nueva entrada. */
+    public static void showNewResearchEntry() {
+        show(Text.translatable("notification.dear_diary.new_entry"));
+    }
+
     public static void showTestNotification() {
         show(Text.translatable("notification.dear_diary.new_entry"));
     }

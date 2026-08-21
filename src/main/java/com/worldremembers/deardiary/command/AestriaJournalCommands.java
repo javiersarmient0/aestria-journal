@@ -74,11 +74,24 @@ public final class AestriaJournalCommands {
                         .executes(context -> AestriaJournalApi.reorganizeResearches(context.getSource())))
                 .then(CommandManager.literal("reset_aestria").requires(AestriaJournalCommands::isOperator)
                         .executes(context -> AestriaJournalApi.resetAestriaDiary(context.getSource())))
+                .then(CommandManager.literal("reload").requires(AestriaJournalCommands::isOperator)
+                        .executes(context -> {
+                            var server = context.getSource().getServer();
+                            if (server == null) return 0;
+                            int updated = AestriaJournalApi.reloadResearches(server);
+                            context.getSource().sendFeedback(
+                                    () -> Text.literal("§aDiario de Aestria recargado. §f" + AestriaResearchRegistry.size()
+                                            + " investigaciones cargadas, " + updated + " entradas actualizadas."), false);
+                            return 1;
+                        }))
                 .then(CommandManager.literal("recargar_investigaciones").requires(AestriaJournalCommands::isOperator)
                         .executes(context -> {
-                            if (context.getSource().getServer() == null) return 0;
-                            AestriaJournalApi.reloadResearches(context.getSource().getServer().getResourceManager());
-                            context.getSource().sendFeedback(() -> Text.literal("Investigaciones de Aestria recargadas."), false);
+                            var server = context.getSource().getServer();
+                            if (server == null) return 0;
+                            int updated = AestriaJournalApi.reloadResearches(server);
+                            context.getSource().sendFeedback(
+                                    () -> Text.literal("§aDiario de Aestria recargado. §f" + AestriaResearchRegistry.size()
+                                            + " investigaciones cargadas, " + updated + " entradas actualizadas."), false);
                             return 1;
                         }))
                 .then(CommandManager.literal("limpiar").requires(AestriaJournalCommands::isOperator).executes(context -> execute(context.getSource(), "deardiary clear_self")))

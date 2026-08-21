@@ -26,9 +26,7 @@ public final class AestriaJournalApi {
     private AestriaJournalApi() {
     }
 
-    public static void reloadResearches(ResourceManager resourceManager) {
-        AestriaResearchLoader.reload(resourceManager);
-    }
+    public static void reloadResearches(ResourceManager resourceManager) { AestriaResearchLoader.reload(resourceManager); }
 
     public static int listResearches(ServerCommandSource source) {
         source.sendFeedback(() -> Text.literal("=== Investigaciones de Aestria ==="), false);
@@ -67,30 +65,21 @@ public final class AestriaJournalApi {
             player.sendMessage(Text.literal("Investigación no encontrada: " + researchId), false);
             return false;
         }
-
         PlayerDiary diary = DearDiaryApi.getDiary(player);
         String eventType = EVENT_PREFIX + research.id();
         DiaryEntry existing = findResearchEntry(diary, research);
         boolean newlyUnlocked = existing == null;
         DiaryEntry entry = existing;
-
         if (newlyUnlocked) {
             entry = DiaryEntry.builder(DiaryEntryKind.AUTOMATIC, eventType, DearDiaryMod.MOD_ID)
-                    .category(research.category())
-                    .importance(research.importance())
-                    .resolvedTitle(research.title())
-                    .resolvedText(research.text())
-                    .icon(research.icon())
-                    .editable(true)
-                    .shareable(false)
-                    .build();
+                    .category(research.category()).importance(research.importance())
+                    .resolvedTitle(research.title()).resolvedText(research.text()).icon(research.icon())
+                    .editable(true).shareable(false).build();
             entry = DearDiaryApi.addEntry(player, entry);
         }
-
         refreshChapterMarker(player, research.chapterTitle());
         DearDiaryServices.storage().save(player.getUuid());
         DearDiaryNetworking.sendDiarySnapshot(player);
-
         if (newlyUnlocked) {
             DearDiaryNetworking.sendResearchEntryNotice(player, entry);
             player.sendMessage(Text.literal("§aNueva investigación desbloqueada: §f" + research.title()), false);
@@ -102,9 +91,8 @@ public final class AestriaJournalApi {
 
     private static DiaryEntry findResearchEntry(PlayerDiary diary, AestriaResearch research) {
         String eventType = EVENT_PREFIX + research.id();
-        return diary.entriesView().stream()
-                .filter(entry -> eventType.equals(entry.getEventType())
-                        || (research.title().equals(entry.getResolvedTitle()) && research.text().equals(entry.getResolvedText())))
+        return diary.entriesView().stream().filter(entry -> eventType.equals(entry.getEventType())
+                || (research.title().equals(entry.getResolvedTitle()) && research.text().equals(entry.getResolvedText())))
                 .findFirst().orElse(null);
     }
 
@@ -124,23 +112,18 @@ public final class AestriaJournalApi {
         DearDiaryApi.createChapterEntry(player, chapterTitle, "", false);
     }
 
-    /** Borra una investigación concreta, incluyendo registros de versiones antiguas. */
     public static int deleteResearch(ServerCommandSource source, String researchId) {
         if (!(source.getEntity() instanceof ServerPlayerEntity player)) {
-            source.sendError(Text.literal("Este comando solo puede usarse dentro del juego."));
-            return 0;
+            source.sendError(Text.literal("Este comando solo puede usarse dentro del juego.")); return 0;
         }
         return deleteResearch(source, researchId, player);
     }
 
-    /** Borra una investigación concreta del jugador indicado. Solo se usa durante desarrollo. */
     public static int deleteResearch(ServerCommandSource source, String researchId, ServerPlayerEntity target) {
         AestriaResearch research = AestriaResearchRegistry.get(researchId).orElse(null);
         if (research == null) {
-            source.sendError(Text.literal("Investigación no encontrada: " + researchId));
-            return 0;
+            source.sendError(Text.literal("Investigación no encontrada: " + researchId)); return 0;
         }
-
         PlayerDiary diary = DearDiaryApi.getDiary(target);
         int removed = 0;
         for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
@@ -150,18 +133,10 @@ public final class AestriaJournalApi {
                 if (deleted) removed++;
             }
         }
-
         boolean chapterStillUsed = diary.entriesView().stream().anyMatch(entry ->
                 AestriaResearchRegistry.all().stream().anyMatch(other ->
                         other.chapterTitle().equals(research.chapterTitle()) && matchesResearch(entry, other)));
-        if (!chapterStillUsed) {
-            for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
-                if (DearDiaryApi.isChapterEntry(entry) && research.chapterTitle().equals(entry.getResolvedTitle())) {
-                    if (DearDiaryApi.deleteEntry(target, entry.getId()) || diary.removeEntry(entry.getId())) removed++;
-                }
-            }
-        }
-
+        if (!chapterStillUsed) removed += deleteChapterInternal(target, research.chapterTitle());
         DearDiaryServices.storage().save(target.getUuid());
         DearDiaryNetworking.sendDiarySnapshot(target);
         final int removedCount = removed;
@@ -169,22 +144,39 @@ public final class AestriaJournalApi {
         return removed;
     }
 
-    /** Development reset. No toca notas personales. */
+    /** Elimina directamente un separador de capítulo, incluso si es una entrada heredada. */
+    public static int deleteChapter(ServerCommandSource source, String chapterTitle, ServerPlayerEntity target) {
+        int removed = deleteChapterInternal(target, chapterTitle);
+        DearDiaryServices.storage().save(target.getUuid());
+        DearDiaryNetworking.sendDiarySnapshot(target);
+        final int removedCount = removed;
+        source.sendFeedback(() -> Text.literal("§aCapítulo " + chapterTitle + " eliminado de " + target.getName().getString() + ". Elementos eliminados: §f" + removedCount), false);
+        return removed;
+    }
+
+    private static int deleteChapterInternal(ServerPlayerEntity target, String chapterTitle) {
+        PlayerDiary diary = DearDiaryApi.getDiary(target);
+        int removed = 0;
+        for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
+            boolean chapterMatch = DearDiaryApi.isChapterEntry(entry) && chapterTitle.equals(entry.getResolvedTitle());
+            boolean legacyMatch = (entry.getEventType() != null && entry.getEventType().equals(LEGACY_CHAPTER_PREFIX + chapterTitle));
+            if (chapterMatch || legacyMatch) {
+                boolean deleted = DearDiaryApi.deleteEntry(target, entry.getId());
+                if (!deleted) deleted = diary.removeEntry(entry.getId());
+                if (deleted) removed++;
+            }
+        }
+        return removed;
+    }
+
     public static int resetAestriaDiary(ServerCommandSource source) {
         if (!(source.getEntity() instanceof ServerPlayerEntity player)) {
-            source.sendError(Text.literal("Este comando solo puede usarse dentro del juego."));
-            return 0;
+            source.sendError(Text.literal("Este comando solo puede usarse dentro del juego.")); return 0;
         }
-
-        Set<String> researchTitles = new HashSet<>();
-        Set<String> researchTexts = new HashSet<>();
-        Set<String> chapterTitles = new HashSet<>();
+        Set<String> researchTitles = new HashSet<>(), researchTexts = new HashSet<>(), chapterTitles = new HashSet<>();
         for (AestriaResearch research : AestriaResearchRegistry.all()) {
-            researchTitles.add(research.title());
-            researchTexts.add(research.text());
-            chapterTitles.add(research.chapterTitle());
+            researchTitles.add(research.title()); researchTexts.add(research.text()); chapterTitles.add(research.chapterTitle());
         }
-
         PlayerDiary diary = DearDiaryApi.getDiary(player);
         int removed = 0;
         for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
@@ -198,42 +190,34 @@ public final class AestriaJournalApi {
                 if (deleted) removed++;
             }
         }
-
         DearDiaryServices.storage().save(player.getUuid());
         DearDiaryNetworking.sendDiarySnapshot(player);
         player.sendMessage(Text.literal("§aDiario de Aestria reiniciado: §f" + removed + " elementos eliminados."), false);
         return removed;
     }
 
-    /** Reordena las investigaciones ya desbloqueadas y reconstruye sus capítulos. */
     public static int reorganizeResearches(ServerCommandSource source) {
         if (!(source.getEntity() instanceof ServerPlayerEntity player)) {
-            source.sendError(Text.literal("Este comando solo puede usarse dentro del juego."));
-            return 0;
+            source.sendError(Text.literal("Este comando solo puede usarse dentro del juego.")); return 0;
         }
-
         PlayerDiary diary = DearDiaryApi.getDiary(player);
         List<String> unlockedIds = new ArrayList<>();
         for (DiaryEntry entry : diary.entriesView()) {
             String eventType = entry.getEventType();
             if (eventType.startsWith(EVENT_PREFIX)) {
-                unlockedIds.add(eventType.substring(EVENT_PREFIX.length()));
-                continue;
+                unlockedIds.add(eventType.substring(EVENT_PREFIX.length())); continue;
             }
             for (AestriaResearch research : AestriaResearchRegistry.all()) {
                 if (research.title().equals(entry.getResolvedTitle()) && research.text().equals(entry.getResolvedText())) {
-                    unlockedIds.add(research.id());
-                    break;
+                    unlockedIds.add(research.id()); break;
                 }
             }
         }
-
         resetAestriaDiary(source);
         int rebuilt = 0;
         for (AestriaResearch research : AestriaResearchRegistry.all()) {
             if (unlockedIds.contains(research.id()) && unlockResearch(player, research.id())) rebuilt++;
         }
-
         DearDiaryServices.storage().save(player.getUuid());
         DearDiaryNetworking.sendDiarySnapshot(player);
         player.sendMessage(Text.literal("§aDiario de Aestria reorganizado: §f" + rebuilt + " investigaciones."), false);

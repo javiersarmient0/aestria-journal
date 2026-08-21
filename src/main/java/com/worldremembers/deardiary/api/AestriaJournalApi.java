@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import net.minecraft.resource.ResourceManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -57,7 +58,12 @@ public final class AestriaJournalApi {
         return unlockResearch(player, researchId) ? 1 : 0;
     }
 
-    /** Desbloquea una investigación para un jugador de forma idempotente. */
+    /**
+     * Desbloquea una investigación y mantiene el marcador de capítulo como
+     * el elemento más reciente del grupo. Esto reproduce el comportamiento
+     * nativo de Dear Diary: las entradas van primero y el capítulo se crea
+     * al final como separador.
+     */
     public static boolean unlockResearch(ServerPlayerEntity player, String researchId) {
         if (researchId == null || researchId.isBlank()) {
             return false;
@@ -71,53 +77,67 @@ public final class AestriaJournalApi {
 
         PlayerDiary diary = DearDiaryApi.getDiary(player);
         String eventType = EVENT_PREFIX + research.id();
-        if (diary.hasEntryWithEventType(eventType)) {
-            player.sendMessage(Text.literal("Esta investigación ya está desbloqueada: " + research.title()), false);
-            return true;
+        DiaryEntry existing = findResearchEntry(diary, research);
+        boolean newlyUnlocked = existing == null;
+        DiaryEntry entry = existing;
+
+        if (newlyUnlocked) {
+            entry = DiaryEntry.builder(DiaryEntryKind.AUTOMATIC, eventType, DearDiaryMod.MOD_ID)
+                    .category(research.category())
+                    .importance(research.importance())
+                    .resolvedTitle(research.title())
+                    .resolvedText(research.text())
+                    .icon(research.icon())
+                    .editable(true)
+                    .shareable(false)
+                    .build();
+
+            DearDiaryApi.addEntry(player, entry);
         }
 
-        /*
-         * Dear Diary renders the newest entries first. Therefore the chapter
-         * marker must be inserted AFTER the first research entry of that
-         * chapter. That makes the chapter separator appear above the entry
-         * in the diary UI, which matches how chapters created by the original
-         * mod behave.
-         */
-        boolean chapterAlreadyExists = hasChapter(player, research.chapterTitle());
-
-        DiaryEntry entry = DiaryEntry.builder(DiaryEntryKind.AUTOMATIC, eventType, DearDiaryMod.MOD_ID)
-                .category(research.category())
-                .importance(research.importance())
-                .resolvedTitle(research.title())
-                .resolvedText(research.text())
-                .icon(research.icon())
-                .editable(true)
-                .shareable(false)
-                .build();
-
-        DearDiaryApi.addEntry(player, entry);
-
-        if (!chapterAlreadyExists) {
-            DearDiaryApi.createChapterEntry(player, research.chapterTitle(), "", false);
-        }
+        // El capítulo es un separador, no un contenedor. Como Dear Diary
+        // muestra lo más reciente arriba, siempre debe recrearse DESPUÉS de
+        // las entradas del capítulo para quedar visualmente encima de ellas.
+        refreshChapterMarker(player, research.chapterTitle());
 
         DearDiaryServices.storage().save(player.getUuid());
         DearDiaryNetworking.sendDiarySnapshot(player);
-        DearDiaryNetworking.sendResearchEntryNotice(player, entry);
-        player.sendMessage(Text.literal("§aNueva investigación desbloqueada: §f" + research.title()), false);
+
+        if (newlyUnlocked) {
+            DearDiaryNetworking.sendResearchEntryNotice(player, entry);
+            player.sendMessage(Text.literal("§aNueva investigación desbloqueada: §f" + research.title()), false);
+        } else {
+            player.sendMessage(Text.literal("§eInvestigación ya desbloqueada; capítulo reorganizado: §f" + research.title()), false);
+        }
         return true;
     }
 
-    private static boolean hasChapter(ServerPlayerEntity player, String chapterTitle) {
+    private static DiaryEntry findResearchEntry(PlayerDiary diary, AestriaResearch research) {
+        String eventType = EVENT_PREFIX + research.id();
+        return diary.entriesView().stream()
+                .filter(entry -> eventType.equals(entry.getEventType())
+                        || (research.title().equals(entry.getResolvedTitle())
+                        && research.text().equals(entry.getResolvedText())))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static void refreshChapterMarker(ServerPlayerEntity player, String chapterTitle) {
         PlayerDiary diary = DearDiaryApi.getDiary(player);
-        return diary.entriesView().stream().anyMatch(entry ->
-                DearDiaryApi.isChapterEntry(entry) && chapterTitle.equals(entry.getResolvedTitle())
-        );
+        for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
+            if (DearDiaryApi.isChapterEntry(entry) && chapterTitle.equals(entry.getResolvedTitle())) {
+                DearDiaryApi.deleteEntry(player, entry.getId());
+            }
+        }
+
+        // El marcador se crea al final para que quede arriba del grupo en la UI.
+        DearDiaryApi.createChapterEntry(player, chapterTitle, "", false);
     }
 
     /**
-     * Development reset: removes only Aestria investigations and Aestria
-     * chapter markers. Personal notes and unrelated Dear Diary entries remain.
+     * Development reset. It identifica investigaciones por eventType y también
+     * por título/texto para poder limpiar entradas creadas por versiones
+     * anteriores del mod. No toca notas personales.
      */
     public static int resetAestriaDiary(ServerCommandSource source) {
         if (!(source.getEntity() instanceof ServerPlayerEntity player)) {
@@ -125,15 +145,21 @@ public final class AestriaJournalApi {
             return 0;
         }
 
+        Set<String> researchTitles = new HashSet<>();
+        Set<String> researchTexts = new HashSet<>();
         Set<String> chapterTitles = new HashSet<>();
         for (AestriaResearch research : AestriaResearchRegistry.all()) {
+            researchTitles.add(research.title());
+            researchTexts.add(research.text());
             chapterTitles.add(research.chapterTitle());
         }
 
         PlayerDiary diary = DearDiaryApi.getDiary(player);
         int removed = 0;
         for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
-            boolean aestriaResearch = entry.getEventType().startsWith(EVENT_PREFIX);
+            boolean aestriaResearch = entry.getEventType().startsWith(EVENT_PREFIX)
+                    || (researchTitles.contains(entry.getResolvedTitle())
+                    && researchTexts.contains(entry.getResolvedText()));
             boolean legacyAestriaChapter = entry.getEventType().startsWith(LEGACY_CHAPTER_PREFIX);
             boolean aestriaChapter = DearDiaryApi.isChapterEntry(entry)
                     && chapterTitles.contains(entry.getResolvedTitle());
@@ -160,11 +186,22 @@ public final class AestriaJournalApi {
         PlayerDiary diary = DearDiaryApi.getDiary(player);
         List<String> unlockedIds = new ArrayList<>();
         for (DiaryEntry entry : diary.entriesView()) {
-            if (entry.getEventType().startsWith(EVENT_PREFIX)) {
-                unlockedIds.add(entry.getEventType().substring(EVENT_PREFIX.length()));
+            String eventType = entry.getEventType();
+            if (eventType.startsWith(EVENT_PREFIX)) {
+                unlockedIds.add(eventType.substring(EVENT_PREFIX.length()));
+                continue;
+            }
+            for (AestriaResearch research : AestriaResearchRegistry.all()) {
+                if (research.title().equals(entry.getResolvedTitle())
+                        && research.text().equals(entry.getResolvedText())) {
+                    unlockedIds.add(research.id());
+                    break;
+                }
             }
         }
 
+        // Se eliminan solamente los elementos de Aestria. Las notas personales
+        // y el resto de Dear Diary permanecen intactos.
         resetAestriaDiary(source);
 
         int rebuilt = 0;

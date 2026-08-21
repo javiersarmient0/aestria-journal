@@ -40,22 +40,34 @@ public final class AestriaResearchLoader {
         );
 
         ensureExternalFiles(bundled);
+        boolean externalFilesFound = false;
+        boolean externalError = false;
 
         if (Files.isDirectory(EXTERNAL_ROOT)) {
             try (var paths = Files.list(EXTERNAL_ROOT)) {
-                paths.filter(path -> path.getFileName().toString().endsWith(".json"))
-                        .sorted()
-                        .forEach(path -> loadFile(path, loaded));
+                var jsonPaths = paths.filter(path -> path.getFileName().toString().endsWith(".json")).sorted().toList();
+                externalFilesFound = !jsonPaths.isEmpty();
+                for (Path path : jsonPaths) {
+                    if (!loadFile(path, loaded)) externalError = true;
+                }
             } catch (IOException exception) {
+                externalError = true;
                 DearDiaryMod.LOGGER.error("No se pudieron leer las investigaciones externas de Aestria", exception);
             }
         }
 
-        if (loaded.isEmpty()) {
+        if (externalError) {
+            DearDiaryMod.LOGGER.error("Diario de Aestria: la recarga fue cancelada porque al menos un JSON es inválido. Se conserva la configuración anterior.");
+            return;
+        }
+
+        if (!externalFilesFound) {
             for (Map.Entry<Identifier, Resource> resourceEntry : bundled.entrySet()) {
                 try (Reader reader = new InputStreamReader(
                         resourceEntry.getValue().getInputStream(), StandardCharsets.UTF_8)) {
-                    loadJson(JsonParser.parseReader(reader).getAsJsonObject(), resourceEntry.getKey().toString(), loaded);
+                    if (!loadJson(JsonParser.parseReader(reader).getAsJsonObject(), resourceEntry.getKey().toString(), loaded)) {
+                        DearDiaryMod.LOGGER.error("No se pudo cargar la investigación {}", resourceEntry.getKey());
+                    }
                 } catch (Exception exception) {
                     DearDiaryMod.LOGGER.error("No se pudo cargar la investigación {}", resourceEntry.getKey(), exception);
                 }
@@ -85,15 +97,16 @@ public final class AestriaResearchLoader {
         }
     }
 
-    private static void loadFile(Path path, List<AestriaResearch> loaded) {
+    private static boolean loadFile(Path path, List<AestriaResearch> loaded) {
         try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
-            loadJson(JsonParser.parseReader(reader).getAsJsonObject(), path.toString(), loaded);
+            return loadJson(JsonParser.parseReader(reader).getAsJsonObject(), path.toString(), loaded);
         } catch (Exception exception) {
-            DearDiaryMod.LOGGER.error("No se pudo cargar {}. Se conservará el resto de investigaciones.", path, exception);
+            DearDiaryMod.LOGGER.error("No se pudo cargar {}. La recarga será cancelada.", path, exception);
+            return false;
         }
     }
 
-    private static void loadJson(JsonObject json, String source, List<AestriaResearch> loaded) {
+    private static boolean loadJson(JsonObject json, String source, List<AestriaResearch> loaded) {
         try {
             String id = json.get("id").getAsString();
             String title = json.get("title").getAsString();
@@ -125,8 +138,10 @@ public final class AestriaResearchLoader {
             String chapterTitle = json.has("chapter_title") ? json.get("chapter_title").getAsString() : defaultChapterTitle(chapterId);
 
             loaded.add(new AestriaResearch(id, title, text, category, importance, icon, chapterId, chapterTitle, shareable));
+            return true;
         } catch (Exception exception) {
             DearDiaryMod.LOGGER.error("Investigación inválida en {}. El archivo fue ignorado.", source, exception);
+            return false;
         }
     }
 

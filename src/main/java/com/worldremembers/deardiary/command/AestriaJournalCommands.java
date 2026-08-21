@@ -18,15 +18,22 @@ public final class AestriaJournalCommands {
     private static final SuggestionProvider<ServerCommandSource> RESEARCH_SUGGESTIONS = (context, builder) -> {
         String remaining = builder.getRemaining().toLowerCase();
         for (var research : AestriaResearchRegistry.all()) {
-            if (research.id().toLowerCase().startsWith(remaining)) {
-                builder.suggest(research.id());
-            }
+            if (research.id().toLowerCase().startsWith(remaining)) builder.suggest(research.id());
         }
         return builder.buildFuture();
     };
 
-    private AestriaJournalCommands() {
-    }
+    private static final SuggestionProvider<ServerCommandSource> CHAPTER_SUGGESTIONS = (context, builder) -> {
+        String remaining = builder.getRemaining().toLowerCase();
+        var seen = new java.util.HashSet<String>();
+        for (var research : AestriaResearchRegistry.all()) {
+            String title = research.chapterTitle();
+            if (seen.add(title) && title.toLowerCase().startsWith(remaining)) builder.suggest(title);
+        }
+        return builder.buildFuture();
+    };
+
+    private AestriaJournalCommands() {}
 
     public static void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> register(dispatcher));
@@ -44,32 +51,30 @@ public final class AestriaJournalCommands {
                 .then(CommandManager.literal("exportar").executes(context -> execute(context.getSource(), "deardiary export markdown")))
                 .then(CommandManager.literal("investigaciones").executes(context -> AestriaJournalApi.listResearches(context.getSource())))
                 .then(CommandManager.literal("desbloquear")
-                        .then(CommandManager.argument("id", StringArgumentType.word())
-                                .suggests(RESEARCH_SUGGESTIONS)
+                        .then(CommandManager.argument("id", StringArgumentType.word()).suggests(RESEARCH_SUGGESTIONS)
                                 .executes(context -> AestriaJournalApi.unlockResearch(context.getSource(), StringArgumentType.getString(context, "id")))
                                 .then(CommandManager.argument("jugador", EntityArgumentType.player())
-                                        .executes(context -> AestriaJournalApi.unlockResearch(
-                                                context.getSource(),
-                                                StringArgumentType.getString(context, "id"),
-                                                EntityArgumentType.getPlayer(context, "jugador"))))))
-                .then(CommandManager.literal("borrar_investigacion")
-                        .requires(AestriaJournalCommands::isOperator)
-                        .then(CommandManager.argument("id", StringArgumentType.word())
-                                .suggests(RESEARCH_SUGGESTIONS)
+                                        .executes(context -> AestriaJournalApi.unlockResearch(context.getSource(), StringArgumentType.getString(context, "id"), EntityArgumentType.getPlayer(context, "jugador"))))))
+                .then(CommandManager.literal("borrar_investigacion").requires(AestriaJournalCommands::isOperator)
+                        .then(CommandManager.argument("id", StringArgumentType.word()).suggests(RESEARCH_SUGGESTIONS)
                                 .executes(context -> AestriaJournalApi.deleteResearch(context.getSource(), StringArgumentType.getString(context, "id")))
                                 .then(CommandManager.argument("jugador", EntityArgumentType.player())
-                                        .executes(context -> AestriaJournalApi.deleteResearch(
-                                                context.getSource(),
-                                                StringArgumentType.getString(context, "id"),
-                                                EntityArgumentType.getPlayer(context, "jugador"))))))
-                .then(CommandManager.literal("reorganizar")
-                        .requires(AestriaJournalCommands::isOperator)
+                                        .executes(context -> AestriaJournalApi.deleteResearch(context.getSource(), StringArgumentType.getString(context, "id"), EntityArgumentType.getPlayer(context, "jugador"))))))
+                .then(CommandManager.literal("borrar_capitulo").requires(AestriaJournalCommands::isOperator)
+                        .then(CommandManager.argument("titulo", StringArgumentType.greedyString()).suggests(CHAPTER_SUGGESTIONS)
+                                .executes(context -> {
+                                    String title = StringArgumentType.getString(context, "titulo");
+                                    if (!(context.getSource().getEntity() instanceof ServerPlayerEntity player)) {
+                                        context.getSource().sendError(Text.literal("Este comando solo puede usarse dentro del juego."));
+                                        return 0;
+                                    }
+                                    return AestriaJournalApi.deleteChapter(context.getSource(), title, player);
+                                })))
+                .then(CommandManager.literal("reorganizar").requires(AestriaJournalCommands::isOperator)
                         .executes(context -> AestriaJournalApi.reorganizeResearches(context.getSource())))
-                .then(CommandManager.literal("reset_aestria")
-                        .requires(AestriaJournalCommands::isOperator)
+                .then(CommandManager.literal("reset_aestria").requires(AestriaJournalCommands::isOperator)
                         .executes(context -> AestriaJournalApi.resetAestriaDiary(context.getSource())))
-                .then(CommandManager.literal("recargar_investigaciones")
-                        .requires(AestriaJournalCommands::isOperator)
+                .then(CommandManager.literal("recargar_investigaciones").requires(AestriaJournalCommands::isOperator)
                         .executes(context -> {
                             if (context.getSource().getServer() == null) return 0;
                             AestriaJournalApi.reloadResearches(context.getSource().getServer().getResourceManager());
@@ -107,14 +112,11 @@ public final class AestriaJournalCommands {
                 .then(CommandManager.literal("compartir_ultima").requires(AestriaJournalCommands::isOperator).executes(context -> execute(context.getSource(), "deardiary share_last"))));
     }
 
-    private static boolean isOperator(ServerCommandSource source) {
-        return source.hasPermissionLevel(2);
-    }
+    private static boolean isOperator(ServerCommandSource source) { return source.hasPermissionLevel(2); }
 
     private static int execute(ServerCommandSource source, String command) {
         if (!(source.getEntity() instanceof ServerPlayerEntity player)) {
-            source.sendError(Text.literal("Este comando solo puede usarse dentro del juego."));
-            return 0;
+            source.sendError(Text.literal("Este comando solo puede usarse dentro del juego.")); return 0;
         }
         player.getServer().getCommandManager().executeWithPrefix(source, command);
         return 1;

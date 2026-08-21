@@ -8,6 +8,7 @@ import com.worldremembers.deardiary.network.payload.DeleteEntryPayload;
 import com.worldremembers.deardiary.network.payload.DiarySnapshotPayload;
 import com.worldremembers.deardiary.network.payload.EditEntryPayload;
 import com.worldremembers.deardiary.network.payload.NewAutomaticEntryPayload;
+import com.worldremembers.deardiary.network.payload.NewResearchEntryPayload;
 import com.worldremembers.deardiary.network.payload.OpenDiaryScreenPayload;
 import com.worldremembers.deardiary.network.payload.RequestDiaryPayload;
 import com.worldremembers.deardiary.network.payload.SetFavoritePayload;
@@ -43,6 +44,7 @@ public final class DearDiaryNetworking {
 
         PayloadTypeRegistry.playS2C().register(DiarySnapshotPayload.ID, DiarySnapshotPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NewAutomaticEntryPayload.ID, NewAutomaticEntryPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(NewResearchEntryPayload.ID, NewResearchEntryPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(OpenDiaryScreenPayload.ID, OpenDiaryScreenPayload.CODEC);
     }
 
@@ -112,6 +114,13 @@ public final class DearDiaryNetworking {
     public static void sendAutomaticEntryNotice(ServerPlayerEntity player, DiaryEntry entry) {
         if (ServerPlayNetworking.canSend(player, NewAutomaticEntryPayload.ID)) {
             ServerPlayNetworking.send(player, NewAutomaticEntryPayload.fromEntry(entry));
+        }
+    }
+
+    /** Reutiliza la notificación visual nativa de Dear Diary para investigaciones de Aestria. */
+    public static void sendResearchEntryNotice(ServerPlayerEntity player, DiaryEntry entry) {
+        if (ServerPlayNetworking.canSend(player, NewResearchEntryPayload.ID)) {
+            ServerPlayNetworking.send(player, NewResearchEntryPayload.fromEntry(entry));
         }
     }
 

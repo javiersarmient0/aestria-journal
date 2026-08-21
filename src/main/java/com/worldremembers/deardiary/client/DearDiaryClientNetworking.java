@@ -7,6 +7,7 @@ import com.worldremembers.deardiary.network.payload.DeleteEntryPayload;
 import com.worldremembers.deardiary.network.payload.DiarySnapshotPayload;
 import com.worldremembers.deardiary.network.payload.EditEntryPayload;
 import com.worldremembers.deardiary.network.payload.NewAutomaticEntryPayload;
+import com.worldremembers.deardiary.network.payload.NewResearchEntryPayload;
 import com.worldremembers.deardiary.network.payload.OpenDiaryScreenPayload;
 import com.worldremembers.deardiary.network.payload.RequestDiaryPayload;
 import com.worldremembers.deardiary.network.payload.SetFavoritePayload;
@@ -36,6 +37,11 @@ public final class DearDiaryClientNetworking {
             ClientDiaryCache.rememberAutomaticEntry(payload.entryJson());
             DiaryNotificationManager.showNewAutomaticEntry();
             DearDiaryMod.LOGGER.debug("Received Dear Diary automatic entry notice");
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(NewResearchEntryPayload.ID, (payload, context) -> {
+            DiaryNotificationManager.showNewResearchEntry();
+            DearDiaryMod.LOGGER.debug("Received Aestria research entry unlock notice");
         });
 
         ClientPlayNetworking.registerGlobalReceiver(OpenDiaryScreenPayload.ID, (payload, context) -> {

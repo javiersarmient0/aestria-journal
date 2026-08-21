@@ -44,6 +44,9 @@ public final class AestriaJournalCommands {
                 .then(CommandManager.literal("reorganizar")
                         .requires(AestriaJournalCommands::isOperator)
                         .executes(context -> AestriaJournalApi.reorganizeResearches(context.getSource())))
+                .then(CommandManager.literal("reset_aestria")
+                        .requires(AestriaJournalCommands::isOperator)
+                        .executes(context -> AestriaJournalApi.resetAestriaDiary(context.getSource())))
                 .then(CommandManager.literal("recargar_investigaciones")
                         .requires(AestriaJournalCommands::isOperator)
                         .executes(context -> {

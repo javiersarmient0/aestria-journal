@@ -5,6 +5,7 @@ import com.worldremembers.deardiary.DearDiaryServices;
 import com.worldremembers.deardiary.data.DiaryCategory;
 import com.worldremembers.deardiary.data.DiaryEntry;
 import com.worldremembers.deardiary.data.DiaryEntryKind;
+import com.worldremembers.deardiary.data.DiaryEntryMarkers;
 import com.worldremembers.deardiary.data.DiaryImportance;
 import com.worldremembers.deardiary.data.PlayerDiary;
 import com.worldremembers.deardiary.network.DearDiaryNetworking;
@@ -21,7 +22,7 @@ import net.minecraft.text.Text;
 /** API específica del contenido de historia/investigación de Aestria. */
 public final class AestriaJournalApi {
     private static final String EVENT_PREFIX = "aestria:investigacion/";
-    private static final String CHAPTER_PREFIX = "aestria:capitulo/";
+    private static final String LEGACY_CHAPTER_PREFIX = "aestria:capitulo/";
 
     private AestriaJournalApi() {
     }
@@ -94,24 +95,46 @@ public final class AestriaJournalApi {
         return true;
     }
 
+    /**
+     * Creates a real Dear Diary chapter marker. The marker event type must be
+     * DiaryEntryMarkers.CHAPTER_EVENT_TYPE; using a custom event type makes the
+     * client render the chapter as a normal yellow diary entry instead.
+     */
     private static void ensureChapter(ServerPlayerEntity player, AestriaResearch research) {
         PlayerDiary diary = DearDiaryApi.getDiary(player);
-        String chapterEvent = CHAPTER_PREFIX + research.chapterId();
-        if (diary.hasEntryWithEventType(chapterEvent)) {
+        String chapterId = research.chapterId();
+
+        boolean chapterExists = diary.entriesView().stream().anyMatch(entry ->
+                DearDiaryApi.isChapterEntry(entry)
+                        && research.chapterTitle().equals(stripFormatting(entry.getResolvedTitle()))
+        );
+        if (chapterExists) {
             return;
         }
 
-        DiaryEntry chapter = DiaryEntry.builder(DiaryEntryKind.MANUAL, chapterEvent, DearDiaryMod.MOD_ID)
+        DiaryEntry chapter = DiaryEntry.builder(
+                        DiaryEntryKind.MANUAL,
+                        DiaryEntryMarkers.CHAPTER_EVENT_TYPE,
+                        DearDiaryMod.MOD_ID
+                )
                 .category(DiaryCategory.OTHER)
                 .importance(DiaryImportance.NORMAL)
-                .resolvedTitle("§6" + research.chapterTitle())
+                .resolvedTitle(research.chapterTitle())
                 .resolvedText("")
                 .icon("minecraft:writable_book")
                 .editable(false)
                 .shareable(false)
+                .customData("aestria_chapter_id", new com.google.gson.JsonPrimitive(chapterId))
                 .build();
 
         DearDiaryApi.addEntry(player, chapter);
+    }
+
+    private static String stripFormatting(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replaceAll("§[0-9a-fk-or]", "");
     }
 
     /** Reordena las investigaciones ya desbloqueadas y reconstruye sus capítulos. */
@@ -129,8 +152,12 @@ public final class AestriaJournalApi {
             }
         }
 
+        // Remove only Aestria's research data. Personal notes and Dear Diary
+        // automatic entries are preserved.
         for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
-            if (entry.getEventType().startsWith(EVENT_PREFIX) || entry.getEventType().startsWith(CHAPTER_PREFIX)) {
+            if (entry.getEventType().startsWith(EVENT_PREFIX)
+                    || entry.getEventType().startsWith(LEGACY_CHAPTER_PREFIX)
+                    || DearDiaryApi.isChapterEntry(entry) && entry.getSource().equals(DearDiaryMod.MOD_ID)) {
                 DearDiaryApi.deleteEntry(player, entry.getId());
             }
         }

@@ -36,7 +36,6 @@ public final class AestriaJournalApi {
             source.sendFeedback(() -> Text.literal("No hay investigaciones cargadas."), false);
             return 0;
         }
-
         String currentChapter = null;
         for (AestriaResearch research : AestriaResearchRegistry.all()) {
             if (!research.chapterId().equals(currentChapter)) {
@@ -61,12 +60,8 @@ public final class AestriaJournalApi {
         return unlockResearch(target, researchId) ? 1 : 0;
     }
 
-    /** Desbloquea una investigación para el jugador indicado. */
     public static boolean unlockResearch(ServerPlayerEntity player, String researchId) {
-        if (researchId == null || researchId.isBlank()) {
-            return false;
-        }
-
+        if (researchId == null || researchId.isBlank()) return false;
         AestriaResearch research = AestriaResearchRegistry.get(researchId).orElse(null);
         if (research == null) {
             player.sendMessage(Text.literal("Investigación no encontrada: " + researchId), false);
@@ -109,26 +104,21 @@ public final class AestriaJournalApi {
         String eventType = EVENT_PREFIX + research.id();
         return diary.entriesView().stream()
                 .filter(entry -> eventType.equals(entry.getEventType())
-                        || (research.title().equals(entry.getResolvedTitle())
-                        && research.text().equals(entry.getResolvedText())))
-                .findFirst()
-                .orElse(null);
+                        || (research.title().equals(entry.getResolvedTitle()) && research.text().equals(entry.getResolvedText())))
+                .findFirst().orElse(null);
     }
 
     private static boolean matchesResearch(DiaryEntry entry, AestriaResearch research) {
         String eventType = EVENT_PREFIX + research.id();
         return eventType.equals(entry.getEventType())
-                || (research.title().equals(entry.getResolvedTitle())
-                && research.text().equals(entry.getResolvedText()));
+                || (research.title().equals(entry.getResolvedTitle()) && research.text().equals(entry.getResolvedText()));
     }
 
     private static void refreshChapterMarker(ServerPlayerEntity player, String chapterTitle) {
         PlayerDiary diary = DearDiaryApi.getDiary(player);
         for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
             if (DearDiaryApi.isChapterEntry(entry) && chapterTitle.equals(entry.getResolvedTitle())) {
-                if (!DearDiaryApi.deleteEntry(player, entry.getId())) {
-                    diary.removeEntry(entry.getId());
-                }
+                if (!DearDiaryApi.deleteEntry(player, entry.getId())) diary.removeEntry(entry.getId());
             }
         }
         DearDiaryApi.createChapterEntry(player, chapterTitle, "", false);
@@ -156,33 +146,26 @@ public final class AestriaJournalApi {
         for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
             if (matchesResearch(entry, research)) {
                 boolean deleted = DearDiaryApi.deleteEntry(target, entry.getId());
-                if (!deleted) {
-                    deleted = diary.removeEntry(entry.getId());
-                }
-                if (deleted) {
-                    removed++;
-                }
+                if (!deleted) deleted = diary.removeEntry(entry.getId());
+                if (deleted) removed++;
             }
         }
 
-        // También elimina el marcador del capítulo si ya no quedan investigaciones
-        // de Aestria pertenecientes a ese capítulo.
         boolean chapterStillUsed = diary.entriesView().stream().anyMatch(entry ->
                 AestriaResearchRegistry.all().stream().anyMatch(other ->
                         other.chapterTitle().equals(research.chapterTitle()) && matchesResearch(entry, other)));
         if (!chapterStillUsed) {
             for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
                 if (DearDiaryApi.isChapterEntry(entry) && research.chapterTitle().equals(entry.getResolvedTitle())) {
-                    if (DearDiaryApi.deleteEntry(target, entry.getId()) || diary.removeEntry(entry.getId())) {
-                        removed++;
-                    }
+                    if (DearDiaryApi.deleteEntry(target, entry.getId()) || diary.removeEntry(entry.getId())) removed++;
                 }
             }
         }
 
         DearDiaryServices.storage().save(target.getUuid());
         DearDiaryNetworking.sendDiarySnapshot(target);
-        source.sendFeedback(() -> Text.literal("§a" + research.title() + " eliminado de " + target.getName().getString() + ". Elementos eliminados: §f" + removed), false);
+        final int removedCount = removed;
+        source.sendFeedback(() -> Text.literal("§a" + research.title() + " eliminado de " + target.getName().getString() + ". Elementos eliminados: §f" + removedCount), false);
         return removed;
     }
 
@@ -209,12 +192,9 @@ public final class AestriaJournalApi {
                     || (researchTitles.contains(entry.getResolvedTitle()) && researchTexts.contains(entry.getResolvedText()));
             boolean legacyAestriaChapter = entry.getEventType().startsWith(LEGACY_CHAPTER_PREFIX);
             boolean aestriaChapter = DearDiaryApi.isChapterEntry(entry) && chapterTitles.contains(entry.getResolvedTitle());
-
             if (aestriaResearch || legacyAestriaChapter || aestriaChapter) {
                 boolean deleted = DearDiaryApi.deleteEntry(player, entry.getId());
-                if (!deleted) {
-                    deleted = diary.removeEntry(entry.getId());
-                }
+                if (!deleted) deleted = diary.removeEntry(entry.getId());
                 if (deleted) removed++;
             }
         }
@@ -249,12 +229,9 @@ public final class AestriaJournalApi {
         }
 
         resetAestriaDiary(source);
-
         int rebuilt = 0;
         for (AestriaResearch research : AestriaResearchRegistry.all()) {
-            if (unlockedIds.contains(research.id()) && unlockResearch(player, research.id())) {
-                rebuilt++;
-            }
+            if (unlockedIds.contains(research.id()) && unlockResearch(player, research.id())) rebuilt++;
         }
 
         DearDiaryServices.storage().save(player.getUuid());

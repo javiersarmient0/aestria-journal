@@ -41,7 +41,8 @@ public final class AestriaJournalApi {
         for (AestriaResearch research : AestriaResearchRegistry.all()) {
             if (!research.chapterId().equals(currentChapter)) {
                 currentChapter = research.chapterId();
-                source.sendFeedback(() -> Text.literal("-- " + research.chapterTitle() + " --"), false);
+                String chapterTitle = research.chapterTitle();
+                source.sendFeedback(() -> Text.literal("-- " + chapterTitle + " --"), false);
             }
             source.sendFeedback(() -> Text.literal(research.id() + " - " + research.title()), false);
         }
@@ -75,9 +76,14 @@ public final class AestriaJournalApi {
             return true;
         }
 
-        // Dear Diary renders a chapter as a timeline separator. It must be
-        // inserted BEFORE the first research entry belonging to that chapter.
-        ensureChapter(player, research);
+        /*
+         * Dear Diary renders the newest entries first. Therefore the chapter
+         * marker must be inserted AFTER the first research entry of that
+         * chapter. That makes the chapter separator appear above the entry
+         * in the diary UI, which matches how chapters created by the original
+         * mod behave.
+         */
+        boolean chapterAlreadyExists = hasChapter(player, research.chapterTitle());
 
         DiaryEntry entry = DiaryEntry.builder(DiaryEntryKind.AUTOMATIC, eventType, DearDiaryMod.MOD_ID)
                 .category(research.category())
@@ -85,13 +91,16 @@ public final class AestriaJournalApi {
                 .resolvedTitle(research.title())
                 .resolvedText(research.text())
                 .icon(research.icon())
-                // Enabled temporarily during development so entries can be
-                // removed/retested repeatedly. Final release will disable it.
                 .editable(true)
                 .shareable(false)
                 .build();
 
         DearDiaryApi.addEntry(player, entry);
+
+        if (!chapterAlreadyExists) {
+            DearDiaryApi.createChapterEntry(player, research.chapterTitle(), "", false);
+        }
+
         DearDiaryServices.storage().save(player.getUuid());
         DearDiaryNetworking.sendDiarySnapshot(player);
         DearDiaryNetworking.sendResearchEntryNotice(player, entry);
@@ -99,19 +108,11 @@ public final class AestriaJournalApi {
         return true;
     }
 
-    /** Creates a real Dear Diary chapter before its first investigation. */
-    private static void ensureChapter(ServerPlayerEntity player, AestriaResearch research) {
+    private static boolean hasChapter(ServerPlayerEntity player, String chapterTitle) {
         PlayerDiary diary = DearDiaryApi.getDiary(player);
-        String chapterTitle = research.chapterTitle();
-
-        boolean chapterExists = diary.entriesView().stream().anyMatch(entry ->
+        return diary.entriesView().stream().anyMatch(entry ->
                 DearDiaryApi.isChapterEntry(entry) && chapterTitle.equals(entry.getResolvedTitle())
         );
-        if (chapterExists) {
-            return;
-        }
-
-        DearDiaryApi.createChapterEntry(player, chapterTitle, "", false);
     }
 
     /**

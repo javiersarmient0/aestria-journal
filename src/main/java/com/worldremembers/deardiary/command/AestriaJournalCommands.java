@@ -80,7 +80,7 @@ public final class AestriaJournalCommands {
                             int updated = AestriaJournalApi.reloadResearches(server);
                             context.getSource().sendFeedback(
                                     () -> Text.literal("§aDiario de Investigador recargado. §f" + AestriaResearchRegistry.size()
-                                            + " investigaciones cargadas, " + updated + " entradas actualizadas."), false);
+                                            + " investigaciones cargadas, " + updated + " entradas actualizadas. §7JSON: config/aestria_journal/investigations/"), false);
                             return 1;
                         }))
                 .then(CommandManager.literal("limpiar").requires(AestriaJournalCommands::isOperator).executes(context -> execute(context.getSource(), "deardiary clear_self")))

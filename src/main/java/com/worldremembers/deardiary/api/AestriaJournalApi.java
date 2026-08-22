@@ -27,9 +27,11 @@ public final class AestriaJournalApi {
     private AestriaJournalApi() {
     }
 
-    public static void reloadResearches(ResourceManager resourceManager) { AestriaResearchLoader.reload(resourceManager); }
+    public static void reloadResearches(ResourceManager resourceManager) {
+        AestriaResearchLoader.reload(resourceManager);
+    }
 
-    /** Recarga los JSON editables y sincroniza el contenido de entradas ya desbloqueadas. */
+    /** Recarga los JSON externos y sincroniza el contenido de las investigaciones ya desbloqueadas. */
     public static int reloadResearches(MinecraftServer server) {
         AestriaResearchLoader.reload(server.getResourceManager());
         int updated = 0;
@@ -232,7 +234,7 @@ public final class AestriaJournalApi {
         }
         DearDiaryServices.storage().save(player.getUuid());
         DearDiaryNetworking.sendDiarySnapshot(player);
-        player.sendMessage(Text.literal("§aDiario de Aestria reiniciado: §f" + removed + " elementos eliminados."), false);
+        player.sendMessage(Text.literal("§aDiario de Investigador reiniciado: §f" + removed + " elementos eliminados."), false);
         return removed;
     }
 
@@ -260,7 +262,7 @@ public final class AestriaJournalApi {
         }
         DearDiaryServices.storage().save(player.getUuid());
         DearDiaryNetworking.sendDiarySnapshot(player);
-        player.sendMessage(Text.literal("§aDiario de Aestria reorganizado: §f" + rebuilt + " investigaciones."), false);
+        player.sendMessage(Text.literal("§aDiario de Investigador reorganizado: §f" + rebuilt + " investigaciones."), false);
         return rebuilt;
     }
 }

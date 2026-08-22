@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import net.fabricmc.loader.api.FabricLoader;
@@ -20,7 +21,7 @@ import net.minecraft.resource.Resource;
 import net.minecraft.resource.ResourceManager;
 import net.minecraft.util.Identifier;
 
-/** Carga investigaciones desde los JSON editables del servidor. */
+/** Carga las investigaciones desde JSON externos editables por el administrador. */
 public final class AestriaResearchLoader {
     private static final String NAMESPACE = "aestria_journal";
     private static final String ROOT = "investigations";
@@ -29,6 +30,10 @@ public final class AestriaResearchLoader {
             .resolve(ROOT);
 
     private AestriaResearchLoader() {
+    }
+
+    public static Path getExternalRoot() {
+        return EXTERNAL_ROOT;
     }
 
     public static void reload(ResourceManager resourceManager) {
@@ -45,22 +50,29 @@ public final class AestriaResearchLoader {
 
         if (Files.isDirectory(EXTERNAL_ROOT)) {
             try (var paths = Files.list(EXTERNAL_ROOT)) {
-                var jsonPaths = paths.filter(path -> path.getFileName().toString().endsWith(".json")).sorted().toList();
+                var jsonPaths = paths
+                        .filter(path -> path.getFileName().toString().endsWith(".json"))
+                        .sorted(Comparator.comparing(path -> path.getFileName().toString()))
+                        .toList();
                 externalFilesFound = !jsonPaths.isEmpty();
                 for (Path path : jsonPaths) {
-                    if (!loadFile(path, loaded)) externalError = true;
+                    if (!loadFile(path, loaded)) {
+                        externalError = true;
+                    }
                 }
             } catch (IOException exception) {
                 externalError = true;
-                DearDiaryMod.LOGGER.error("No se pudieron leer las investigaciones externas de Aestria", exception);
+                DearDiaryMod.LOGGER.error("No se pudieron leer las investigaciones externas de Diario de Investigador", exception);
             }
         }
 
         if (externalError) {
-            DearDiaryMod.LOGGER.error("Diario de Aestria: la recarga fue cancelada porque al menos un JSON es inválido. Se conserva la configuración anterior.");
+            DearDiaryMod.LOGGER.error("Diario de Investigador: la recarga fue cancelada porque al menos un JSON es inválido. Se conserva la configuración anterior.");
             return;
         }
 
+        // Los JSON incluidos en el mod solo sirven como plantillas iniciales.
+        // Una vez copiados a config/, los archivos externos pasan a ser la única fuente de contenido.
         if (!externalFilesFound) {
             for (Map.Entry<Identifier, Resource> resourceEntry : bundled.entrySet()) {
                 try (Reader reader = new InputStreamReader(
@@ -75,7 +87,7 @@ public final class AestriaResearchLoader {
         }
 
         AestriaResearchRegistry.replaceAll(loaded);
-        DearDiaryMod.LOGGER.info("Diario de Aestria: {} investigaciones cargadas desde {}", loaded.size(), EXTERNAL_ROOT);
+        DearDiaryMod.LOGGER.info("Diario de Investigador: {} investigaciones cargadas desde {}", loaded.size(), EXTERNAL_ROOT);
     }
 
     private static void ensureExternalFiles(Map<Identifier, Resource> bundled) {
@@ -84,16 +96,18 @@ public final class AestriaResearchLoader {
             for (Map.Entry<Identifier, Resource> resourceEntry : bundled.entrySet()) {
                 String fileName = resourceEntry.getKey().getPath().substring(ROOT.length() + 1);
                 Path target = EXTERNAL_ROOT.resolve(fileName);
-                if (Files.exists(target)) continue;
+                if (Files.exists(target)) {
+                    continue;
+                }
                 Files.createDirectories(target.getParent());
                 try (var input = resourceEntry.getValue().getInputStream();
                      OutputStream output = Files.newOutputStream(target)) {
                     input.transferTo(output);
                 }
-                DearDiaryMod.LOGGER.info("Diario de Aestria: creado JSON editable {}", target);
+                DearDiaryMod.LOGGER.info("Diario de Investigador: creado JSON editable {}", target);
             }
         } catch (IOException exception) {
-            DearDiaryMod.LOGGER.error("No se pudieron preparar los JSON editables de Aestria", exception);
+            DearDiaryMod.LOGGER.error("No se pudieron preparar los JSON editables de Diario de Investigador", exception);
         }
     }
 
@@ -148,7 +162,7 @@ public final class AestriaResearchLoader {
     private static String defaultChapterId(String researchId) {
         return switch (researchId) {
             case "capitan_jones", "damian", "marinero_elias" -> "puerto_cerezo";
-            case "tomas", "astronomo", "profesor_oak", "cultivos_auroras", "primera_investigacion" -> "pueblo_albor";
+            case "tomas", "astronomo", "profesor_oak", "cultivos_auroras", "primera_investigacion", "akira", "ernesto" -> "pueblo_albor";
             default -> "general";
         };
     }

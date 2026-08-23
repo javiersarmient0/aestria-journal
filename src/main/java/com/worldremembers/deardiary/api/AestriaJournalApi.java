@@ -14,7 +14,6 @@ import com.worldremembers.deardiary.research.AestriaResearchLoader;
 import com.worldremembers.deardiary.research.AestriaResearchRegistry;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import net.minecraft.resource.ResourceManager;
 import net.minecraft.server.MinecraftServer;
@@ -28,38 +27,75 @@ public final class AestriaJournalApi {
 
     private AestriaJournalApi() {}
 
-    public static void reloadResearches(ResourceManager resourceManager) { AestriaResearchLoader.reload(resourceManager); }
+    public static void reloadResearches(ResourceManager resourceManager) {
+        AestriaResearchLoader.reload(resourceManager);
+    }
 
     public static int reloadResearches(MinecraftServer server) {
         AestriaResearchLoader.reload(server.getResourceManager());
         int updated = 0;
+        int removed = 0;
+
         for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
             PlayerDiary diary = DearDiaryApi.getDiary(player);
             boolean changed = false;
             Set<String> usedChapters = new HashSet<>();
-            for (DiaryEntry entry : diary.entriesView()) {
+
+            for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
                 if (!isResearchEntry(entry)) continue;
-                AestriaResearch research = AestriaResearchRegistry.get(entry.getEventType().substring(EVENT_PREFIX.length())).orElse(null);
-                if (research == null) continue;
+
+                String researchId = entry.getEventType().substring(EVENT_PREFIX.length());
+                AestriaResearch research = AestriaResearchRegistry.get(researchId).orElse(null);
+
+                if (research == null) {
+                    boolean deleted = DearDiaryApi.deleteEntry(player, entry.getId());
+                    if (!deleted) deleted = diary.removeEntry(entry.getId());
+                    if (deleted) {
+                        removed++;
+                        changed = true;
+                        DearDiaryMod.LOGGER.info("Diario de Investigador: eliminada la entrada '{}' porque su JSON ya no existe.", researchId);
+                    }
+                    continue;
+                }
+
                 entry.setChapter(research.chapterId(), research.chapterTitle(), research.chapterOrder());
+                usedChapters.add(research.chapterId());
                 if (entry.isEditable()) {
                     entry.updateResolvedText(research.title(), research.text());
                     updated++;
                 }
-                usedChapters.add(research.chapterId());
                 changed = true;
             }
+
+            for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
+                if (!DearDiaryApi.isChapterEntry(entry)) continue;
+                String chapterId = entry.getChapterId();
+                if (chapterId == null || chapterId.isBlank() || usedChapters.contains(chapterId)) continue;
+
+                boolean deleted = DearDiaryApi.deleteEntry(player, entry.getId());
+                if (!deleted) deleted = diary.removeEntry(entry.getId());
+                if (deleted) {
+                    removed++;
+                    changed = true;
+                }
+            }
+
             for (String chapterId : usedChapters) {
                 AestriaResearch chapter = AestriaResearchRegistry.all().stream()
-                        .filter(research -> research.chapterId().equals(chapterId)).findFirst().orElse(null);
+                        .filter(research -> research.chapterId().equals(chapterId))
+                        .findFirst()
+                        .orElse(null);
                 if (chapter != null && ensureChapterMarker(player, chapter)) changed = true;
             }
+
             diary.resort();
             if (changed) {
                 DearDiaryServices.storage().save(player.getUuid());
                 DearDiaryNetworking.sendDiarySnapshot(player);
             }
         }
+
+        DearDiaryMod.LOGGER.info("Diario de Investigador: recarga sincronizada. {} entradas actualizadas, {} eliminadas.", updated, removed);
         return updated;
     }
 

@@ -4,6 +4,8 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.worldremembers.deardiary.api.AestriaJournalApi;
+import com.worldremembers.deardiary.api.DearDiaryApi;
+import com.worldremembers.deardiary.network.DearDiaryNetworking;
 import com.worldremembers.deardiary.research.AestriaResearchRegistry;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.command.argument.EntityArgumentType;
@@ -40,14 +42,9 @@ public final class AestriaJournalCommands {
 
     private static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
         dispatcher.register(CommandManager.literal("diario")
-                .executes(context -> execute(context.getSource(), "deardiary open"))
-                .then(CommandManager.literal("abrir").executes(context -> execute(context.getSource(), "deardiary open")))
-                .then(CommandManager.literal("nuevo").executes(context -> execute(context.getSource(), "deardiary open new")))
-                .then(CommandManager.literal("lista").executes(context -> execute(context.getSource(), "deardiary list")))
-                .then(CommandManager.literal("capitulo")
-                        .then(CommandManager.argument("titulo", StringArgumentType.greedyString())
-                                .executes(context -> execute(context.getSource(), "deardiary chapter " + StringArgumentType.getString(context, "titulo")))))
-                .then(CommandManager.literal("exportar").executes(context -> execute(context.getSource(), "deardiary export markdown")))
+                .executes(context -> open(context.getSource(), false))
+                .then(CommandManager.literal("abrir").executes(context -> open(context.getSource(), false)))
+                .then(CommandManager.literal("nuevo").executes(context -> open(context.getSource(), true)))
                 .then(CommandManager.literal("investigaciones").executes(context -> AestriaJournalApi.listResearches(context.getSource())))
                 .then(CommandManager.literal("desbloquear")
                         .then(CommandManager.argument("id", StringArgumentType.word()).suggests(RESEARCH_SUGGESTIONS)
@@ -83,18 +80,28 @@ public final class AestriaJournalCommands {
                                             + " investigaciones cargadas, " + updated + " entradas actualizadas. §7JSON: config/aestria_journal/investigations/"), false);
                             return 1;
                         }))
-                .then(CommandManager.literal("limpiar").requires(AestriaJournalCommands::isOperator).executes(context -> execute(context.getSource(), "deardiary clear_self")))
-                .then(CommandManager.literal("prueba").requires(AestriaJournalCommands::isOperator).executes(context -> execute(context.getSource(), "deardiary add_test")))
-                .then(CommandManager.literal("prueba_manual").requires(AestriaJournalCommands::isOperator).executes(context -> execute(context.getSource(), "deardiary add_manual_test"))));
+                .then(CommandManager.literal("limpiar").requires(AestriaJournalCommands::isOperator)
+                        .executes(context -> clearSelf(context.getSource()))));
     }
 
     private static boolean isOperator(ServerCommandSource source) { return source.hasPermissionLevel(2); }
 
-    private static int execute(ServerCommandSource source, String command) {
+    private static int open(ServerCommandSource source, boolean newEntry) {
         if (!(source.getEntity() instanceof ServerPlayerEntity player)) {
-            source.sendError(Text.literal("Este comando solo puede usarse dentro del juego.")); return 0;
+            source.sendError(Text.literal("Este comando solo puede usarse dentro del juego."));
+            return 0;
         }
-        player.getServer().getCommandManager().executeWithPrefix(source, command);
+        return DearDiaryNetworking.openDiaryScreen(player, newEntry) ? 1 : 0;
+    }
+
+    private static int clearSelf(ServerCommandSource source) {
+        if (!(source.getEntity() instanceof ServerPlayerEntity player)) {
+            source.sendError(Text.literal("Este comando solo puede usarse dentro del juego."));
+            return 0;
+        }
+        DearDiaryApi.clearDiary(player);
+        DearDiaryNetworking.sendDiarySnapshot(player);
+        source.sendFeedback(() -> Text.literal("§aDiario limpiado."), false);
         return 1;
     }
 }

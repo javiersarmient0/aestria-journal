@@ -97,9 +97,9 @@ public final class AestriaJournalApi {
         DiaryEntry entry = findResearchEntry(diary, research);
         boolean newlyUnlocked = entry == null;
 
-        // El capítulo siempre se resuelve desde el JSON antes de crear la investigación.
-        // Esto evita que una entrada nueva termine en la categoría general y además
-        // garantiza que el separador quede cronológicamente antes de la primera entrada.
+        // El capítulo se resuelve desde el JSON antes de crear la investigación.
+        // Así una entrada nueva nunca cae en una categoría general y el separador
+        // puede quedar cronológicamente antes de la primera investigación.
         ensureChapterMarker(player, research.chapterTitle(), Instant.now());
 
         if (newlyUnlocked) {
@@ -117,8 +117,8 @@ public final class AestriaJournalApi {
             entry.updateResolvedText(research.title(), research.text());
         }
 
-        // Si el capítulo existía antes de la investigación y quedó debajo de ella,
-        // reorganizará únicamente ese separador, sin tocar ninguna investigación.
+        // Si el marcador existía debajo de la investigación, solo se mueve ese
+        // separador. Las investigaciones existentes nunca se eliminan ni recrean.
         ensureChapterMarker(player, research.chapterTitle(), entry.getCreatedAt());
 
         DearDiaryServices.storage().save(player.getUuid());
@@ -132,11 +132,7 @@ public final class AestriaJournalApi {
         return true;
     }
 
-    /**
-     * Una investigación se identifica exclusivamente por su eventType/ID estable.
-     * Nunca usamos título + texto como identidad porque los JSON se pueden copiar
-     * como plantilla y dos investigaciones pueden compartir contenido inicialmente.
-     */
+    /** Una investigación se identifica exclusivamente por su eventType/ID estable. */
     private static DiaryEntry findResearchEntry(PlayerDiary diary, AestriaResearch research) {
         String eventType = EVENT_PREFIX + research.id();
         return diary.entriesView().stream()
@@ -146,14 +142,10 @@ public final class AestriaJournalApi {
     }
 
     private static boolean matchesResearch(DiaryEntry entry, AestriaResearch research) {
-        String eventType = EVENT_PREFIX + research.id();
-        return eventType.equals(entry.getEventType());
+        return (EVENT_PREFIX + research.id()).equals(entry.getEventType());
     }
 
-    /**
-     * Garantiza que exista un separador para el capítulo y, si se conoce una entrada
-     * de referencia, lo coloca inmediatamente antes de ella. No mueve investigaciones.
-     */
+    /** Garantiza un separador y, si se conoce una entrada de referencia, lo coloca antes de ella. */
     private static boolean ensureChapterMarker(ServerPlayerEntity player, String chapterTitle, Instant beforeEntry) {
         if (chapterTitle == null || chapterTitle.isBlank()) return false;
 
@@ -182,8 +174,6 @@ public final class AestriaJournalApi {
         }
 
         if (beforeEntry != null && !existing.getCreatedAt().isBefore(beforeEntry)) {
-            // Reemplazamos solamente el marcador para conservarlo justo antes de la
-            // investigación. Las entradas de investigación nunca se eliminan ni recrean.
             UUIDPreservingChapter.replace(player, existing, beforeEntry.minusNanos(1));
             return true;
         }
@@ -243,12 +233,8 @@ public final class AestriaJournalApi {
 
     public static int resetAestriaDiary(ServerCommandSource source) {
         if (!(source.getEntity() instanceof ServerPlayerEntity player)) return 0;
-        Set<String> titles = new HashSet<>(), texts = new HashSet<>(), chapters = new HashSet<>();
-        for (AestriaResearch research : AestriaResearchRegistry.all()) {
-            titles.add(research.title());
-            texts.add(research.text());
-            chapters.add(research.chapterTitle());
-        }
+        Set<String> chapters = new HashSet<>();
+        for (AestriaResearch research : AestriaResearchRegistry.all()) chapters.add(research.chapterTitle());
         PlayerDiary diary = DearDiaryApi.getDiary(player);
         int removed = 0;
         for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
@@ -289,15 +275,11 @@ public final class AestriaJournalApi {
         return unlockedEntries.size();
     }
 
-    /**
-     * Reemplaza únicamente un marcador de capítulo manteniendo su UUID y título.
-     * Se mantiene aislado para que ninguna investigación sea tocada durante una
-     * reorganización.
-     */
+    /** Reemplaza únicamente un marcador de capítulo manteniendo su UUID. */
     private static final class UUIDPreservingChapter {
         private static void replace(ServerPlayerEntity player, DiaryEntry existing, Instant createdAt) {
             PlayerDiary diary = DearDiaryApi.getDiary(player);
-            UUID id = existing.getId();
+            java.util.UUID id = existing.getId();
             String title = existing.getResolvedTitle();
             String text = existing.getResolvedText();
             boolean favorite = existing.isFavorite();

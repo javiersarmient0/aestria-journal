@@ -12,12 +12,10 @@ import com.worldremembers.deardiary.network.DearDiaryNetworking;
 import com.worldremembers.deardiary.research.AestriaResearch;
 import com.worldremembers.deardiary.research.AestriaResearchLoader;
 import com.worldremembers.deardiary.research.AestriaResearchRegistry;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import net.minecraft.resource.ResourceManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
@@ -30,9 +28,7 @@ public final class AestriaJournalApi {
 
     private AestriaJournalApi() {}
 
-    public static void reloadResearches(ResourceManager resourceManager) {
-        AestriaResearchLoader.reload(resourceManager);
-    }
+    public static void reloadResearches(ResourceManager resourceManager) { AestriaResearchLoader.reload(resourceManager); }
 
     public static int reloadResearches(MinecraftServer server) {
         AestriaResearchLoader.reload(server.getResourceManager());
@@ -43,10 +39,8 @@ public final class AestriaJournalApi {
             Set<String> usedChapters = new HashSet<>();
             for (DiaryEntry entry : diary.entriesView()) {
                 if (!isResearchEntry(entry)) continue;
-                String researchId = entry.getEventType().substring(EVENT_PREFIX.length());
-                AestriaResearch research = AestriaResearchRegistry.get(researchId).orElse(null);
+                AestriaResearch research = AestriaResearchRegistry.get(entry.getEventType().substring(EVENT_PREFIX.length())).orElse(null);
                 if (research == null) continue;
-
                 entry.setChapter(research.chapterId(), research.chapterTitle(), research.chapterOrder());
                 if (entry.isEditable()) {
                     entry.updateResolvedText(research.title(), research.text());
@@ -56,11 +50,11 @@ public final class AestriaJournalApi {
                 changed = true;
             }
             for (String chapterId : usedChapters) {
-                AestriaResearch chapterResearch = AestriaResearchRegistry.all().stream()
-                        .filter(research -> research.chapterId().equals(chapterId))
-                        .findFirst().orElse(null);
-                if (chapterResearch != null && ensureChapterMarker(player, chapterResearch, null)) changed = true;
+                AestriaResearch chapter = AestriaResearchRegistry.all().stream()
+                        .filter(research -> research.chapterId().equals(chapterId)).findFirst().orElse(null);
+                if (chapter != null && ensureChapterMarker(player, chapter)) changed = true;
             }
+            diary.resort();
             if (changed) {
                 DearDiaryServices.storage().save(player.getUuid());
                 DearDiaryNetworking.sendDiarySnapshot(player);
@@ -106,7 +100,7 @@ public final class AestriaJournalApi {
         DiaryEntry entry = findResearchEntry(diary, research);
         boolean newlyUnlocked = entry == null;
 
-        ensureChapterMarker(player, research, null);
+        ensureChapterMarker(player, research);
 
         if (newlyUnlocked) {
             DiaryEntry.Builder builder = DiaryEntry.builder(DiaryEntryKind.AUTOMATIC, eventType, DearDiaryMod.MOD_ID)
@@ -127,6 +121,7 @@ public final class AestriaJournalApi {
             if (entry.isEditable()) entry.updateResolvedText(research.title(), research.text());
         }
 
+        diary.resort();
         DearDiaryServices.storage().save(player.getUuid());
         DearDiaryNetworking.sendDiarySnapshot(player);
         if (newlyUnlocked) {
@@ -147,19 +142,12 @@ public final class AestriaJournalApi {
         return (EVENT_PREFIX + research.id()).equals(entry.getEventType());
     }
 
-    /**
-     * Chapters remain timeline dividers for compatibility, but their identity and
-     * order are fixed by chapter metadata. Reorganizing never deletes or recreates
-     * research entries.
-     */
-    private static boolean ensureChapterMarker(ServerPlayerEntity player, AestriaResearch research, Instant ignored) {
+    private static boolean ensureChapterMarker(ServerPlayerEntity player, AestriaResearch research) {
         PlayerDiary diary = DearDiaryApi.getDiary(player);
         DiaryEntry existing = diary.entriesView().stream()
                 .filter(DearDiaryApi::isChapterEntry)
-                .filter(entry -> research.chapterId().equals(entry.getChapterId())
-                        || research.chapterTitle().equals(entry.getResolvedTitle()))
+                .filter(entry -> research.chapterId().equals(entry.getChapterId()) || research.chapterTitle().equals(entry.getResolvedTitle()))
                 .findFirst().orElse(null);
-
         if (existing == null) {
             DiaryEntry marker = DiaryEntry.builder(DiaryEntryKind.MANUAL, DiaryEntryMarkers.CHAPTER_EVENT_TYPE, DearDiaryMod.MOD_ID)
                     .category(DiaryCategory.OTHER)
@@ -174,7 +162,6 @@ public final class AestriaJournalApi {
             DearDiaryApi.addEntry(player, marker);
             return true;
         }
-
         existing.setChapter(research.chapterId(), research.chapterTitle(), research.chapterOrder());
         return false;
     }
@@ -219,6 +206,7 @@ public final class AestriaJournalApi {
                 && AestriaResearchRegistry.get(entry.getEventType().substring(EVENT_PREFIX.length()))
                 .map(other -> other.chapterId().equals(research.chapterId())).orElse(false));
         if (!chapterStillUsed) removed += deleteChapterInternal(target, research.chapterTitle());
+        diary.resort();
         DearDiaryServices.storage().save(target.getUuid());
         DearDiaryNetworking.sendDiarySnapshot(target);
         final int result = removed;
@@ -228,6 +216,8 @@ public final class AestriaJournalApi {
 
     public static int deleteChapter(ServerCommandSource source, String chapterTitle, ServerPlayerEntity target) {
         int removed = deleteChapterInternal(target, chapterTitle);
+        PlayerDiary diary = DearDiaryApi.getDiary(target);
+        diary.resort();
         DearDiaryServices.storage().save(target.getUuid());
         DearDiaryNetworking.sendDiarySnapshot(target);
         final int result = removed;
@@ -255,32 +245,26 @@ public final class AestriaJournalApi {
         return removed;
     }
 
-    /**
-     * Reconciles metadata only. It never infers chapter membership from order,
-     * category, title, text, or unlock time, and it never recreates research entries.
-     */
+    /** Metadata reconciliation only. It never moves an entry to another chapter. */
     public static int reorganizeResearches(ServerCommandSource source) {
         if (!(source.getEntity() instanceof ServerPlayerEntity player)) return 0;
         PlayerDiary diary = DearDiaryApi.getDiary(player);
         int reconciled = 0;
         Set<String> chapters = new HashSet<>();
-
         for (DiaryEntry entry : diary.entriesView()) {
             if (!isResearchEntry(entry)) continue;
-            String researchId = entry.getEventType().substring(EVENT_PREFIX.length());
-            AestriaResearch research = AestriaResearchRegistry.get(researchId).orElse(null);
+            AestriaResearch research = AestriaResearchRegistry.get(entry.getEventType().substring(EVENT_PREFIX.length())).orElse(null);
             if (research == null) continue;
             entry.setChapter(research.chapterId(), research.chapterTitle(), research.chapterOrder());
             chapters.add(research.chapterId());
             reconciled++;
         }
-
         for (String chapterId : chapters) {
             AestriaResearch chapter = AestriaResearchRegistry.all().stream()
                     .filter(research -> research.chapterId().equals(chapterId)).findFirst().orElse(null);
-            if (chapter != null) ensureChapterMarker(player, chapter, null);
+            if (chapter != null) ensureChapterMarker(player, chapter);
         }
-
+        diary.resort();
         DearDiaryServices.storage().save(player.getUuid());
         DearDiaryNetworking.sendDiarySnapshot(player);
         final int result = reconciled;

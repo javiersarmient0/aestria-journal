@@ -1,6 +1,5 @@
 package com.worldremembers.deardiary;
 
-import com.worldremembers.deardiary.command.DearDiaryCommands;
 import com.worldremembers.deardiary.command.AestriaJournalCommands;
 import com.worldremembers.deardiary.compat.fabric.FabricCompatBootstrap;
 import com.worldremembers.deardiary.config.DearDiaryConfigManager;
@@ -37,7 +36,8 @@ public final class DearDiaryMod implements ModInitializer {
         DearDiaryNetworking.register();
         FabricCompatBootstrap.register();
         configManager.writeSupportFiles();
-        DearDiaryCommands.register();
+        // El comando original /deardiary queda deshabilitado para que la interfaz pública
+        // del mod sea únicamente /diario y no exponga comandos internos en inglés.
         AestriaJournalCommands.register();
 
         ServerLifecycleEvents.SERVER_STARTING.register(server -> {

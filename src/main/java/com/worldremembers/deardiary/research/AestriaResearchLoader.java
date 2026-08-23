@@ -36,15 +36,14 @@ public final class AestriaResearchLoader {
                 identifier -> identifier.getNamespace().equals(NAMESPACE) && identifier.getPath().endsWith(".json"));
 
         initializeExternalFilesIfNeeded(bundled);
-        boolean externalFilesFound = false;
+        boolean externalMode = Files.isDirectory(EXTERNAL_ROOT);
         boolean externalError = false;
 
-        if (Files.isDirectory(EXTERNAL_ROOT)) {
+        if (externalMode) {
             try (var paths = Files.walk(EXTERNAL_ROOT)) {
                 var jsonPaths = paths.filter(Files::isRegularFile)
                         .filter(path -> path.getFileName().toString().endsWith(".json"))
                         .sorted(Comparator.comparing(Path::toString)).toList();
-                externalFilesFound = !jsonPaths.isEmpty();
                 for (Path path : jsonPaths) if (!loadFile(path, loaded)) externalError = true;
             } catch (IOException exception) {
                 externalError = true;
@@ -57,7 +56,9 @@ public final class AestriaResearchLoader {
             return;
         }
 
-        if (!externalFilesFound) {
+        // Once the external directory exists, it is authoritative even when it is empty.
+        // This makes deleting the last JSON a real deletion instead of restoring bundled defaults.
+        if (!externalMode) {
             for (Map.Entry<Identifier, Resource> resourceEntry : bundled.entrySet()) {
                 try (Reader reader = new InputStreamReader(resourceEntry.getValue().getInputStream(), StandardCharsets.UTF_8)) {
                     loadJson(JsonParser.parseReader(reader).getAsJsonObject(), resourceEntry.getKey().toString(), loaded);

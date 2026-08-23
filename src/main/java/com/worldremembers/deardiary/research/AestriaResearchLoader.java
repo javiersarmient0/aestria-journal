@@ -7,8 +7,8 @@ import com.worldremembers.deardiary.data.DiaryCategory;
 import com.worldremembers.deardiary.data.DiaryImportance;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.Reader;
 import java.io.OutputStream;
+import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,38 +21,49 @@ import net.minecraft.resource.Resource;
 import net.minecraft.resource.ResourceManager;
 import net.minecraft.util.Identifier;
 
-/** Carga las investigaciones desde JSON externos editables por el administrador. */
+/** Carga investigaciones desde JSON externos, organizados por capítulo/pueblo. */
 public final class AestriaResearchLoader {
     private static final String NAMESPACE = "aestria_journal";
     private static final String ROOT = "investigations";
-    private static final Path EXTERNAL_ROOT = FabricLoader.getInstance().getConfigDir().resolve("aestria_journal").resolve(ROOT);
+    private static final Path EXTERNAL_ROOT = FabricLoader.getInstance().getConfigDir()
+            .resolve("aestria_journal")
+            .resolve(ROOT);
 
     private AestriaResearchLoader() {}
+
     public static Path getExternalRoot() { return EXTERNAL_ROOT; }
 
     public static void reload(ResourceManager resourceManager) {
         List<AestriaResearch> loaded = new ArrayList<>();
         Map<Identifier, Resource> bundled = resourceManager.findResources(ROOT,
                 identifier -> identifier.getNamespace().equals(NAMESPACE) && identifier.getPath().endsWith(".json"));
+
         ensureExternalFiles(bundled);
         boolean externalFilesFound = false;
         boolean externalError = false;
 
         if (Files.isDirectory(EXTERNAL_ROOT)) {
-            try (var paths = Files.list(EXTERNAL_ROOT)) {
-                var jsonPaths = paths.filter(path -> path.getFileName().toString().endsWith(".json"))
-                        .sorted(Comparator.comparing(path -> path.getFileName().toString())).toList();
+            try (var paths = Files.walk(EXTERNAL_ROOT)) {
+                var jsonPaths = paths
+                        .filter(Files::isRegularFile)
+                        .filter(path -> path.getFileName().toString().endsWith(".json"))
+                        .sorted(Comparator.comparing(Path::toString))
+                        .toList();
                 externalFilesFound = !jsonPaths.isEmpty();
-                for (Path path : jsonPaths) if (!loadFile(path, loaded)) externalError = true;
+                for (Path path : jsonPaths) {
+                    if (!loadFile(path, loaded)) externalError = true;
+                }
             } catch (IOException exception) {
                 externalError = true;
-                DearDiaryMod.LOGGER.error("No se pudieron leer las investigaciones externas", exception);
+                DearDiaryMod.LOGGER.error("No se pudieron leer las investigaciones externas de Diario de Investigador", exception);
             }
         }
+
         if (externalError) {
             DearDiaryMod.LOGGER.error("Diario de Investigador: recarga cancelada por JSON inválido; se conserva la configuración anterior.");
             return;
         }
+
         if (!externalFilesFound) {
             for (Map.Entry<Identifier, Resource> resourceEntry : bundled.entrySet()) {
                 try (Reader reader = new InputStreamReader(resourceEntry.getValue().getInputStream(), StandardCharsets.UTF_8)) {
@@ -62,6 +73,7 @@ public final class AestriaResearchLoader {
                 }
             }
         }
+
         AestriaResearchRegistry.replaceAll(loaded);
         DearDiaryMod.LOGGER.info("Diario de Investigador: {} investigaciones cargadas desde {}", loaded.size(), EXTERNAL_ROOT);
     }
@@ -70,16 +82,18 @@ public final class AestriaResearchLoader {
         try {
             Files.createDirectories(EXTERNAL_ROOT);
             for (Map.Entry<Identifier, Resource> resourceEntry : bundled.entrySet()) {
-                String fileName = resourceEntry.getKey().getPath().substring(ROOT.length() + 1);
-                Path target = EXTERNAL_ROOT.resolve(fileName);
+                String relative = resourceEntry.getKey().getPath().substring(ROOT.length() + 1);
+                Path target = EXTERNAL_ROOT.resolve(relative);
                 if (Files.exists(target)) continue;
-                Files.createDirectories(target.getParent());
-                try (var input = resourceEntry.getValue().getInputStream(); OutputStream output = Files.newOutputStream(target)) {
+                Path parent = target.getParent();
+                if (parent != null) Files.createDirectories(parent);
+                try (var input = resourceEntry.getValue().getInputStream();
+                     OutputStream output = Files.newOutputStream(target)) {
                     input.transferTo(output);
                 }
             }
         } catch (IOException exception) {
-            DearDiaryMod.LOGGER.error("No se pudieron preparar los JSON editables", exception);
+            DearDiaryMod.LOGGER.error("No se pudieron preparar los JSON editables de Diario de Investigador", exception);
         }
     }
 
@@ -95,8 +109,9 @@ public final class AestriaResearchLoader {
     private static boolean loadJson(JsonObject json, String source, List<AestriaResearch> loaded) {
         try {
             String id = json.get("id").getAsString();
-            // Astrónomo era una entrada antigua. Ernesto es la única entrada del NPC.
+            // Astrónomo era una entrada antigua. Ernesto es la única entrada de ese NPC.
             if ("astronomo".equals(id)) return true;
+
             String title = json.get("title").getAsString();
             String text = json.has("text") ? json.get("text").getAsString() : "";
             if (json.has("content") && json.get("content").isJsonArray()) {
@@ -112,12 +127,18 @@ public final class AestriaResearchLoader {
                 }
                 if (builder.length() > 0) text = builder.toString();
             }
-            DiaryCategory category = json.has("category") ? DiaryCategory.valueOf(json.get("category").getAsString().toUpperCase()) : DiaryCategory.DISCOVERY;
-            DiaryImportance importance = json.has("importance") ? DiaryImportance.valueOf(json.get("importance").getAsString().toUpperCase()) : DiaryImportance.NORMAL;
+
+            DiaryCategory category = json.has("category")
+                    ? DiaryCategory.valueOf(json.get("category").getAsString().toUpperCase())
+                    : DiaryCategory.DISCOVERY;
+            DiaryImportance importance = json.has("importance")
+                    ? DiaryImportance.valueOf(json.get("importance").getAsString().toUpperCase())
+                    : DiaryImportance.NORMAL;
             String icon = json.has("icon") ? json.get("icon").getAsString() : "minecraft:writable_book";
             boolean shareable = json.has("shareable") && json.get("shareable").getAsBoolean();
             String chapterId = json.has("chapter_id") ? json.get("chapter_id").getAsString() : defaultChapterId(id);
             String chapterTitle = json.has("chapter_title") ? json.get("chapter_title").getAsString() : defaultChapterTitle(chapterId);
+
             loaded.add(new AestriaResearch(id, title, text, category, importance, icon, chapterId, chapterTitle, shareable));
             return true;
         } catch (Exception exception) {

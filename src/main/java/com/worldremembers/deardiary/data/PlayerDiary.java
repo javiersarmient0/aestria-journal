@@ -78,12 +78,9 @@ public final class PlayerDiary {
         return automaticEventState;
     }
 
-    /**
-     * Chapter-aware ordering is deterministic and independent of unlock time.
-     * Entries without chapter metadata remain in the general section after the
-     * chaptered research. Within a chapter, the chapter marker is first and the
-     * research entries keep their original creation order.
-     */
+    /** Reapplies the deterministic chapter-aware ordering after metadata changes. */
+    public void resort() { sortChronologically(); }
+
     private void sortChronologically() {
         entries.sort(Comparator
                 .comparingInt((DiaryEntry entry) -> entry.getChapterOrder())

@@ -9,6 +9,7 @@ import com.worldremembers.deardiary.network.DearDiaryNetworking;
 import com.worldremembers.deardiary.research.AestriaResearch;
 import com.worldremembers.deardiary.research.AestriaResearchLoader;
 import com.worldremembers.deardiary.research.AestriaResearchRegistry;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -49,7 +50,7 @@ public final class AestriaJournalApi {
                 usedChapters.add(research.chapterTitle());
             }
             for (String chapterTitle : usedChapters) {
-                if (ensureChapterMarker(player, chapterTitle)) changed = true;
+                if (ensureChapterMarker(player, chapterTitle, null)) changed = true;
             }
             if (changed) {
                 DearDiaryServices.storage().save(player.getUuid());
@@ -90,20 +91,36 @@ public final class AestriaJournalApi {
             player.sendMessage(Text.literal("Investigación no encontrada: " + researchId), false);
             return false;
         }
+
         PlayerDiary diary = DearDiaryApi.getDiary(player);
         String eventType = EVENT_PREFIX + research.id();
         DiaryEntry entry = findResearchEntry(diary, research);
         boolean newlyUnlocked = entry == null;
+
+        // El capítulo siempre se resuelve desde el JSON antes de crear la investigación.
+        // Esto evita que una entrada nueva termine en la categoría general y además
+        // garantiza que el separador quede cronológicamente antes de la primera entrada.
+        ensureChapterMarker(player, research.chapterTitle(), Instant.now());
+
         if (newlyUnlocked) {
             entry = DiaryEntry.builder(DiaryEntryKind.AUTOMATIC, eventType, DearDiaryMod.MOD_ID)
-                    .category(research.category()).importance(research.importance())
-                    .resolvedTitle(research.title()).resolvedText(research.text()).icon(research.icon())
-                    .editable(true).shareable(false).build();
+                    .category(research.category())
+                    .importance(research.importance())
+                    .resolvedTitle(research.title())
+                    .resolvedText(research.text())
+                    .icon(research.icon())
+                    .editable(true)
+                    .shareable(false)
+                    .build();
             entry = DearDiaryApi.addEntry(player, entry);
         } else if (entry.isEditable()) {
             entry.updateResolvedText(research.title(), research.text());
         }
-        ensureChapterMarker(player, research.chapterTitle());
+
+        // Si el capítulo existía antes de la investigación y quedó debajo de ella,
+        // reorganizará únicamente ese separador, sin tocar ninguna investigación.
+        ensureChapterMarker(player, research.chapterTitle(), entry.getCreatedAt());
+
         DearDiaryServices.storage().save(player.getUuid());
         DearDiaryNetworking.sendDiarySnapshot(player);
         if (newlyUnlocked) {
@@ -115,26 +132,62 @@ public final class AestriaJournalApi {
         return true;
     }
 
+    /**
+     * Una investigación se identifica exclusivamente por su eventType/ID estable.
+     * Nunca usamos título + texto como identidad porque los JSON se pueden copiar
+     * como plantilla y dos investigaciones pueden compartir contenido inicialmente.
+     */
     private static DiaryEntry findResearchEntry(PlayerDiary diary, AestriaResearch research) {
         String eventType = EVENT_PREFIX + research.id();
-        return diary.entriesView().stream().filter(entry -> eventType.equals(entry.getEventType())
-                || (research.title().equals(entry.getResolvedTitle()) && research.text().equals(entry.getResolvedText())))
-                .findFirst().orElse(null);
+        return diary.entriesView().stream()
+                .filter(entry -> eventType.equals(entry.getEventType()))
+                .findFirst()
+                .orElse(null);
     }
 
     private static boolean matchesResearch(DiaryEntry entry, AestriaResearch research) {
         String eventType = EVENT_PREFIX + research.id();
-        return eventType.equals(entry.getEventType())
-                || (research.title().equals(entry.getResolvedTitle()) && research.text().equals(entry.getResolvedText()));
+        return eventType.equals(entry.getEventType());
     }
 
-    private static boolean ensureChapterMarker(ServerPlayerEntity player, String chapterTitle) {
+    /**
+     * Garantiza que exista un separador para el capítulo y, si se conoce una entrada
+     * de referencia, lo coloca inmediatamente antes de ella. No mueve investigaciones.
+     */
+    private static boolean ensureChapterMarker(ServerPlayerEntity player, String chapterTitle, Instant beforeEntry) {
+        if (chapterTitle == null || chapterTitle.isBlank()) return false;
+
         PlayerDiary diary = DearDiaryApi.getDiary(player);
-        if (diary.entriesView().stream().anyMatch(entry -> DearDiaryApi.isChapterEntry(entry) && chapterTitle.equals(entry.getResolvedTitle()))) {
-            return false;
+        DiaryEntry existing = diary.entriesView().stream()
+                .filter(DearDiaryApi::isChapterEntry)
+                .filter(entry -> chapterTitle.equals(entry.getResolvedTitle()))
+                .findFirst()
+                .orElse(null);
+
+        if (existing == null) {
+            DiaryEntry.Builder builder = DiaryEntry.builder(
+                            DiaryEntryKind.MANUAL,
+                            com.worldremembers.deardiary.data.DiaryEntryMarkers.CHAPTER_EVENT_TYPE,
+                            DearDiaryMod.MOD_ID)
+                    .category(com.worldremembers.deardiary.data.DiaryCategory.OTHER)
+                    .importance(com.worldremembers.deardiary.data.DiaryImportance.NORMAL)
+                    .resolvedTitle(chapterTitle)
+                    .resolvedText("")
+                    .icon("minecraft:writable_book")
+                    .editable(true)
+                    .shareable(false);
+            if (beforeEntry != null) builder.createdAt(beforeEntry.minusNanos(1));
+            DearDiaryApi.addEntry(player, builder.build());
+            return true;
         }
-        DearDiaryApi.createChapterEntry(player, chapterTitle, "", false);
-        return true;
+
+        if (beforeEntry != null && !existing.getCreatedAt().isBefore(beforeEntry)) {
+            // Reemplazamos solamente el marcador para conservarlo justo antes de la
+            // investigación. Las entradas de investigación nunca se eliminan ni recrean.
+            UUIDPreservingChapter.replace(player, existing, beforeEntry.minusNanos(1));
+            return true;
+        }
+        return false;
     }
 
     private static int deleteChapterInternal(ServerPlayerEntity target, String chapterTitle) {
@@ -192,13 +245,14 @@ public final class AestriaJournalApi {
         if (!(source.getEntity() instanceof ServerPlayerEntity player)) return 0;
         Set<String> titles = new HashSet<>(), texts = new HashSet<>(), chapters = new HashSet<>();
         for (AestriaResearch research : AestriaResearchRegistry.all()) {
-            titles.add(research.title()); texts.add(research.text()); chapters.add(research.chapterTitle());
+            titles.add(research.title());
+            texts.add(research.text());
+            chapters.add(research.chapterTitle());
         }
         PlayerDiary diary = DearDiaryApi.getDiary(player);
         int removed = 0;
         for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
-            boolean research = entry.getEventType() != null && entry.getEventType().startsWith(EVENT_PREFIX)
-                    || (titles.contains(entry.getResolvedTitle()) && texts.contains(entry.getResolvedText()));
+            boolean research = entry.getEventType() != null && entry.getEventType().startsWith(EVENT_PREFIX);
             boolean chapter = DearDiaryApi.isChapterEntry(entry) && chapters.contains(entry.getResolvedTitle());
             boolean legacy = entry.getEventType() != null && entry.getEventType().startsWith(LEGACY_CHAPTER_PREFIX);
             if (research || chapter || legacy) {
@@ -213,28 +267,57 @@ public final class AestriaJournalApi {
         return removed;
     }
 
-    /** Solo reconstruye separadores. Nunca borra ni recrea investigaciones existentes. */
+    /** Solo garantiza los separadores necesarios. Nunca borra ni recrea investigaciones. */
     public static int reorganizeResearches(ServerCommandSource source) {
         if (!(source.getEntity() instanceof ServerPlayerEntity player)) return 0;
         PlayerDiary diary = DearDiaryApi.getDiary(player);
-        Set<String> unlocked = new HashSet<>();
-        for (DiaryEntry entry : diary.entriesView()) {
-            String eventType = entry.getEventType();
-            if (eventType != null && eventType.startsWith(EVENT_PREFIX)) unlocked.add(eventType.substring(EVENT_PREFIX.length()));
-        }
-        for (DiaryEntry entry : new ArrayList<>(diary.entriesView())) {
-            if (DearDiaryApi.isChapterEntry(entry) && AestriaResearchRegistry.all().stream().anyMatch(r -> r.chapterTitle().equals(entry.getResolvedTitle()))) {
-                boolean deleted = DearDiaryApi.deleteEntry(player, entry.getId());
-                if (!deleted) diary.removeEntry(entry.getId());
-            }
-        }
-        Set<String> chapters = new HashSet<>();
-        for (AestriaResearch research : AestriaResearchRegistry.all()) if (unlocked.contains(research.id())) chapters.add(research.chapterTitle());
+        List<DiaryEntry> unlockedEntries = diary.entriesView().stream()
+                .filter(entry -> entry.getEventType() != null && entry.getEventType().startsWith(EVENT_PREFIX))
+                .toList();
+
         int created = 0;
-        for (String chapter : chapters) if (ensureChapterMarker(player, chapter)) created++;
+        for (DiaryEntry entry : unlockedEntries) {
+            String researchId = entry.getEventType().substring(EVENT_PREFIX.length());
+            AestriaResearch research = AestriaResearchRegistry.get(researchId).orElse(null);
+            if (research == null) continue;
+            if (ensureChapterMarker(player, research.chapterTitle(), entry.getCreatedAt())) created++;
+        }
+
         DearDiaryServices.storage().save(player.getUuid());
         DearDiaryNetworking.sendDiarySnapshot(player);
-        player.sendMessage(Text.literal("§aDiario de Investigador reorganizado: §f" + unlocked.size() + " investigaciones, " + created + " capítulos."), false);
-        return unlocked.size();
+        player.sendMessage(Text.literal("§aDiario de Investigador reorganizado: §f" + unlockedEntries.size() + " investigaciones, " + created + " capítulos ajustados."), false);
+        return unlockedEntries.size();
+    }
+
+    /**
+     * Reemplaza únicamente un marcador de capítulo manteniendo su UUID y título.
+     * Se mantiene aislado para que ninguna investigación sea tocada durante una
+     * reorganización.
+     */
+    private static final class UUIDPreservingChapter {
+        private static void replace(ServerPlayerEntity player, DiaryEntry existing, Instant createdAt) {
+            PlayerDiary diary = DearDiaryApi.getDiary(player);
+            UUID id = existing.getId();
+            String title = existing.getResolvedTitle();
+            String text = existing.getResolvedText();
+            boolean favorite = existing.isFavorite();
+            diary.removeEntry(id);
+            DiaryEntry replacement = DiaryEntry.builder(
+                            DiaryEntryKind.MANUAL,
+                            com.worldremembers.deardiary.data.DiaryEntryMarkers.CHAPTER_EVENT_TYPE,
+                            DearDiaryMod.MOD_ID)
+                    .id(id)
+                    .category(com.worldremembers.deardiary.data.DiaryCategory.OTHER)
+                    .importance(com.worldremembers.deardiary.data.DiaryImportance.NORMAL)
+                    .createdAt(createdAt)
+                    .resolvedTitle(title)
+                    .resolvedText(text)
+                    .icon("minecraft:writable_book")
+                    .favorite(favorite)
+                    .editable(true)
+                    .shareable(false)
+                    .build();
+            diary.addEntry(replacement);
+        }
     }
 }

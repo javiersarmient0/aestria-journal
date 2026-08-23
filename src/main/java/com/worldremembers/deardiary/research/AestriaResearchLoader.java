@@ -25,12 +25,9 @@ import net.minecraft.util.Identifier;
 public final class AestriaResearchLoader {
     private static final String NAMESPACE = "aestria_journal";
     private static final String ROOT = "investigations";
-    private static final Path EXTERNAL_ROOT = FabricLoader.getInstance().getConfigDir()
-            .resolve("aestria_journal")
-            .resolve(ROOT);
+    private static final Path EXTERNAL_ROOT = FabricLoader.getInstance().getConfigDir().resolve("aestria_journal").resolve(ROOT);
 
     private AestriaResearchLoader() {}
-
     public static Path getExternalRoot() { return EXTERNAL_ROOT; }
 
     public static void reload(ResourceManager resourceManager) {
@@ -38,25 +35,17 @@ public final class AestriaResearchLoader {
         Map<Identifier, Resource> bundled = resourceManager.findResources(ROOT,
                 identifier -> identifier.getNamespace().equals(NAMESPACE) && identifier.getPath().endsWith(".json"));
 
-        // Los JSON externos son propiedad del servidor. El contenido incluido en el JAR
-        // solo se copia durante la primera creación de la carpeta. A partir de ese momento
-        // nunca se vuelven a crear archivos que el administrador haya eliminado.
         initializeExternalFilesIfNeeded(bundled);
-
         boolean externalFilesFound = false;
         boolean externalError = false;
 
         if (Files.isDirectory(EXTERNAL_ROOT)) {
             try (var paths = Files.walk(EXTERNAL_ROOT)) {
-                var jsonPaths = paths
-                        .filter(Files::isRegularFile)
+                var jsonPaths = paths.filter(Files::isRegularFile)
                         .filter(path -> path.getFileName().toString().endsWith(".json"))
-                        .sorted(Comparator.comparing(Path::toString))
-                        .toList();
+                        .sorted(Comparator.comparing(Path::toString)).toList();
                 externalFilesFound = !jsonPaths.isEmpty();
-                for (Path path : jsonPaths) {
-                    if (!loadFile(path, loaded)) externalError = true;
-                }
+                for (Path path : jsonPaths) if (!loadFile(path, loaded)) externalError = true;
             } catch (IOException exception) {
                 externalError = true;
                 DearDiaryMod.LOGGER.error("No se pudieron leer las investigaciones externas de Diario de Investigador", exception);
@@ -68,8 +57,6 @@ public final class AestriaResearchLoader {
             return;
         }
 
-        // Solo se utiliza el contenido del JAR como respaldo si no existe ningún JSON
-        // externo. Normalmente esto solo ocurre en una instalación completamente nueva.
         if (!externalFilesFound) {
             for (Map.Entry<Identifier, Resource> resourceEntry : bundled.entrySet()) {
                 try (Reader reader = new InputStreamReader(resourceEntry.getValue().getInputStream(), StandardCharsets.UTF_8)) {
@@ -80,30 +67,26 @@ public final class AestriaResearchLoader {
             }
         }
 
+        loaded.sort(Comparator.comparingInt(AestriaResearch::chapterOrder)
+                .thenComparing(AestriaResearch::chapterId)
+                .thenComparing(AestriaResearch::id));
         AestriaResearchRegistry.replaceAll(loaded);
         DearDiaryMod.LOGGER.info("Diario de Investigador: {} investigaciones cargadas desde {}", loaded.size(), EXTERNAL_ROOT);
     }
 
     private static void initializeExternalFilesIfNeeded(Map<Identifier, Resource> bundled) {
         try {
-            if (Files.exists(EXTERNAL_ROOT)) {
-                return;
-            }
-
+            if (Files.exists(EXTERNAL_ROOT)) return;
             Files.createDirectories(EXTERNAL_ROOT);
-
             for (Map.Entry<Identifier, Resource> resourceEntry : bundled.entrySet()) {
                 String relative = resourceEntry.getKey().getPath().substring(ROOT.length() + 1);
                 Path target = EXTERNAL_ROOT.resolve(relative);
                 Path parent = target.getParent();
                 if (parent != null) Files.createDirectories(parent);
-
-                try (var input = resourceEntry.getValue().getInputStream();
-                     OutputStream output = Files.newOutputStream(target)) {
+                try (var input = resourceEntry.getValue().getInputStream(); OutputStream output = Files.newOutputStream(target)) {
                     input.transferTo(output);
                 }
             }
-
             DearDiaryMod.LOGGER.info("Diario de Investigador: se creó la carpeta inicial de investigaciones en {}", EXTERNAL_ROOT);
         } catch (IOException exception) {
             DearDiaryMod.LOGGER.error("No se pudieron preparar los JSON iniciales de Diario de Investigador", exception);
@@ -122,9 +105,7 @@ public final class AestriaResearchLoader {
     private static boolean loadJson(JsonObject json, String source, List<AestriaResearch> loaded) {
         try {
             String id = json.get("id").getAsString();
-            // Astrónomo era una entrada antigua. Ernesto es la única entrada de ese NPC.
             if ("astronomo".equals(id)) return true;
-
             String title = json.get("title").getAsString();
             String text = json.has("text") ? json.get("text").getAsString() : "";
             if (json.has("content") && json.get("content").isJsonArray()) {
@@ -140,19 +121,15 @@ public final class AestriaResearchLoader {
                 }
                 if (builder.length() > 0) text = builder.toString();
             }
-
-            DiaryCategory category = json.has("category")
-                    ? DiaryCategory.valueOf(json.get("category").getAsString().toUpperCase())
-                    : DiaryCategory.DISCOVERY;
-            DiaryImportance importance = json.has("importance")
-                    ? DiaryImportance.valueOf(json.get("importance").getAsString().toUpperCase())
-                    : DiaryImportance.NORMAL;
+            DiaryCategory category = json.has("category") ? DiaryCategory.valueOf(json.get("category").getAsString().toUpperCase()) : DiaryCategory.DISCOVERY;
+            DiaryImportance importance = json.has("importance") ? DiaryImportance.valueOf(json.get("importance").getAsString().toUpperCase()) : DiaryImportance.NORMAL;
             String icon = json.has("icon") ? json.get("icon").getAsString() : "minecraft:writable_book";
             boolean shareable = json.has("shareable") && json.get("shareable").getAsBoolean();
             String chapterId = json.has("chapter_id") ? json.get("chapter_id").getAsString() : defaultChapterId(id);
             String chapterTitle = json.has("chapter_title") ? json.get("chapter_title").getAsString() : defaultChapterTitle(chapterId);
-
-            loaded.add(new AestriaResearch(id, title, text, category, importance, icon, chapterId, chapterTitle, shareable));
+            int chapterOrder = json.has("chapter_order") ? json.get("chapter_order").getAsInt() : defaultChapterOrder(chapterId);
+            String subtitle = json.has("subtitle") ? json.get("subtitle").getAsString() : "";
+            loaded.add(new AestriaResearch(id, title, text, category, importance, icon, chapterId, chapterTitle, chapterOrder, subtitle, shareable));
             return true;
         } catch (Exception exception) {
             DearDiaryMod.LOGGER.error("Investigación inválida en {}", source, exception);
@@ -175,6 +152,15 @@ public final class AestriaResearchLoader {
             case "pueblo_albor" -> "Capítulo 2 · Pueblo Albor";
             case "anotaciones_personales" -> "Capítulo 3 · Anotaciones personales";
             default -> "Investigaciones";
+        };
+    }
+
+    private static int defaultChapterOrder(String chapterId) {
+        return switch (chapterId) {
+            case "puerto_cerezo" -> 1;
+            case "pueblo_albor" -> 2;
+            case "anotaciones_personales" -> 3;
+            default -> 1000;
         };
     }
 }

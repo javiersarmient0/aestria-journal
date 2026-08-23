@@ -7,13 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
-/**
- * Stored diary entry model.
- *
- * <p>External integrations may read entries returned by the API, but should
- * not construct or mutate stored entries directly for normal gameplay. Use
- * {@code DearDiaryApi} and automatic event definitions instead.</p>
- */
+/** Stored diary entry model. */
 public final class DiaryEntry {
     private UUID id = UUID.randomUUID();
     private String eventType = "manual";
@@ -36,8 +30,7 @@ public final class DiaryEntry {
     private boolean shareable = true;
     private Map<String, JsonElement> customData = new LinkedHashMap<>();
 
-    public DiaryEntry() {
-    }
+    public DiaryEntry() {}
 
     private DiaryEntry(Builder builder) {
         this.id = builder.id;
@@ -79,7 +72,6 @@ public final class DiaryEntry {
         resolvedText = resolvedText == null ? "" : resolvedText;
         icon = normalizeText(icon, "minecraft:writable_book");
         customData = customData == null ? new LinkedHashMap<>() : customData;
-
         if (dimension == null || x == null || y == null || z == null) {
             dimension = null;
             x = null;
@@ -92,84 +84,57 @@ public final class DiaryEntry {
         return value == null || value.isBlank() ? fallback : value;
     }
 
-    public UUID getId() {
-        return id;
+    public UUID getId() { return id; }
+    public String getEventType() { return eventType; }
+    public String getSource() { return source; }
+    public DiaryEntryKind getEntryKind() { return entryKind; }
+    public DiaryCategory getCategory() { return category; }
+    public DiaryImportance getImportance() { return importance; }
+    public Instant getCreatedAt() { return createdAt; }
+    public String getTitleKey() { return titleKey; }
+    public String getTextKey() { return textKey; }
+    public String getResolvedTitle() { return resolvedTitle; }
+    public String getResolvedText() { return resolvedText; }
+    public String getDimension() { return dimension; }
+    public Integer getX() { return x; }
+    public Integer getY() { return y; }
+    public Integer getZ() { return z; }
+    public String getIcon() { return icon; }
+    public boolean isFavorite() { return favorite; }
+    public boolean isEditable() { return editable; }
+    public boolean isShareable() { return shareable; }
+    public Map<String, JsonElement> getCustomData() { return Map.copyOf(customData); }
+
+    public String getChapterId() {
+        JsonElement value = customData.get("chapter_id");
+        return value != null && value.isJsonPrimitive() ? value.getAsString() : null;
     }
 
-    public String getEventType() {
-        return eventType;
+    public String getChapterTitle() {
+        JsonElement value = customData.get("chapter_title");
+        return value != null && value.isJsonPrimitive() ? value.getAsString() : null;
     }
 
-    public String getSource() {
-        return source;
+    public int getChapterOrder() {
+        JsonElement value = customData.get("chapter_order");
+        if (value != null && value.isJsonPrimitive()) {
+            try { return value.getAsInt(); } catch (Exception ignored) {}
+        }
+        return Integer.MAX_VALUE;
     }
 
-    public DiaryEntryKind getEntryKind() {
-        return entryKind;
-    }
-
-    public DiaryCategory getCategory() {
-        return category;
-    }
-
-    public DiaryImportance getImportance() {
-        return importance;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public String getTitleKey() {
-        return titleKey;
-    }
-
-    public String getTextKey() {
-        return textKey;
-    }
-
-    public String getResolvedTitle() {
-        return resolvedTitle;
-    }
-
-    public String getResolvedText() {
-        return resolvedText;
-    }
-
-    public String getDimension() {
-        return dimension;
-    }
-
-    public Integer getX() {
-        return x;
-    }
-
-    public Integer getY() {
-        return y;
-    }
-
-    public Integer getZ() {
-        return z;
-    }
-
-    public String getIcon() {
-        return icon;
-    }
-
-    public boolean isFavorite() {
-        return favorite;
-    }
-
-    public boolean isEditable() {
-        return editable;
-    }
-
-    public boolean isShareable() {
-        return shareable;
-    }
-
-    public Map<String, JsonElement> getCustomData() {
-        return Map.copyOf(customData);
+    public void setChapter(String chapterId, String chapterTitle, int chapterOrder) {
+        if (chapterId == null || chapterId.isBlank()) {
+            customData.remove("chapter_id");
+            customData.remove("chapter_title");
+            customData.remove("chapter_order");
+            return;
+        }
+        customData.put("chapter_id", com.google.gson.JsonPrimitive.class.cast(new com.google.gson.JsonPrimitive(chapterId)));
+        if (chapterTitle != null && !chapterTitle.isBlank()) {
+            customData.put("chapter_title", new com.google.gson.JsonPrimitive(chapterTitle));
+        }
+        customData.put("chapter_order", new com.google.gson.JsonPrimitive(chapterOrder));
     }
 
     public boolean hasLocation() {
@@ -177,17 +142,12 @@ public final class DiaryEntry {
     }
 
     public void updateResolvedText(String title, String text) {
-        if (!editable) {
-            throw new IllegalStateException("Diary entry is not editable");
-        }
-
+        if (!editable) throw new IllegalStateException("Diary entry is not editable");
         resolvedTitle = title == null ? "" : title;
         resolvedText = text == null ? "" : text;
     }
 
-    public void setFavorite(boolean favorite) {
-        this.favorite = favorite;
-    }
+    public void setFavorite(boolean favorite) { this.favorite = favorite; }
 
     public static final class Builder {
         private UUID id = UUID.randomUUID();
@@ -215,88 +175,29 @@ public final class DiaryEntry {
             this.entryKind = Objects.requireNonNull(entryKind, "entryKind");
             this.eventType = eventType;
             this.source = source;
-            if (entryKind == DiaryEntryKind.MANUAL) {
-                this.category = DiaryCategory.MANUAL;
-            }
+            if (entryKind == DiaryEntryKind.MANUAL) this.category = DiaryCategory.MANUAL;
         }
 
-        public Builder id(UUID id) {
-            this.id = id;
+        public Builder id(UUID id) { this.id = id; return this; }
+        public Builder category(DiaryCategory category) { this.category = category; return this; }
+        public Builder importance(DiaryImportance importance) { this.importance = importance; return this; }
+        public Builder createdAt(Instant createdAt) { this.createdAt = createdAt; return this; }
+        public Builder titleKey(String titleKey) { this.titleKey = titleKey; return this; }
+        public Builder textKey(String textKey) { this.textKey = textKey; return this; }
+        public Builder resolvedTitle(String resolvedTitle) { this.resolvedTitle = resolvedTitle; return this; }
+        public Builder resolvedText(String resolvedText) { this.resolvedText = resolvedText; return this; }
+        public Builder location(String dimension, int x, int y, int z) { this.dimension = dimension; this.x = x; this.y = y; this.z = z; return this; }
+        public Builder icon(String icon) { this.icon = icon; return this; }
+        public Builder favorite(boolean favorite) { this.favorite = favorite; return this; }
+        public Builder editable(boolean editable) { this.editable = editable; return this; }
+        public Builder shareable(boolean shareable) { this.shareable = shareable; return this; }
+        public Builder customData(String key, JsonElement value) { if (key != null && !key.isBlank() && value != null) customData.put(key, value); return this; }
+        public Builder chapter(String chapterId, String chapterTitle, int chapterOrder) {
+            customData("chapter_id", new com.google.gson.JsonPrimitive(chapterId));
+            customData("chapter_title", new com.google.gson.JsonPrimitive(chapterTitle));
+            customData("chapter_order", new com.google.gson.JsonPrimitive(chapterOrder));
             return this;
         }
-
-        public Builder category(DiaryCategory category) {
-            this.category = category;
-            return this;
-        }
-
-        public Builder importance(DiaryImportance importance) {
-            this.importance = importance;
-            return this;
-        }
-
-        public Builder createdAt(Instant createdAt) {
-            this.createdAt = createdAt;
-            return this;
-        }
-
-        public Builder titleKey(String titleKey) {
-            this.titleKey = titleKey;
-            return this;
-        }
-
-        public Builder textKey(String textKey) {
-            this.textKey = textKey;
-            return this;
-        }
-
-        public Builder resolvedTitle(String resolvedTitle) {
-            this.resolvedTitle = resolvedTitle;
-            return this;
-        }
-
-        public Builder resolvedText(String resolvedText) {
-            this.resolvedText = resolvedText;
-            return this;
-        }
-
-        public Builder location(String dimension, int x, int y, int z) {
-            this.dimension = dimension;
-            this.x = x;
-            this.y = y;
-            this.z = z;
-            return this;
-        }
-
-        public Builder icon(String icon) {
-            this.icon = icon;
-            return this;
-        }
-
-        public Builder favorite(boolean favorite) {
-            this.favorite = favorite;
-            return this;
-        }
-
-        public Builder editable(boolean editable) {
-            this.editable = editable;
-            return this;
-        }
-
-        public Builder shareable(boolean shareable) {
-            this.shareable = shareable;
-            return this;
-        }
-
-        public Builder customData(String key, JsonElement value) {
-            if (key != null && !key.isBlank() && value != null) {
-                customData.put(key, value);
-            }
-            return this;
-        }
-
-        public DiaryEntry build() {
-            return new DiaryEntry(this);
-        }
+        public DiaryEntry build() { return new DiaryEntry(this); }
     }
 }

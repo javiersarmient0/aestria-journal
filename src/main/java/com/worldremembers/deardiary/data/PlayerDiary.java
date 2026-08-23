@@ -6,26 +6,17 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Per-player diary container loaded from server storage.
- *
- * <p>Compatibility code should treat this as a read model and write through
- * the public API or automatic trigger service.</p>
- */
+/** Per-player diary container loaded from server storage. */
 public final class PlayerDiary {
-    public static final int CURRENT_DATA_VERSION = 2;
+    public static final int CURRENT_DATA_VERSION = 3;
 
     private int dataVersion = CURRENT_DATA_VERSION;
     private UUID playerUuid;
     private List<DiaryEntry> entries = new ArrayList<>();
     private AutomaticEventState automaticEventState = new AutomaticEventState();
 
-    public PlayerDiary() {
-    }
-
-    public PlayerDiary(UUID playerUuid) {
-        this.playerUuid = playerUuid;
-    }
+    public PlayerDiary() {}
+    public PlayerDiary(UUID playerUuid) { this.playerUuid = playerUuid; }
 
     public void normalize(UUID fallbackPlayerUuid) {
         dataVersion = dataVersion <= 0 ? CURRENT_DATA_VERSION : Math.max(dataVersion, CURRENT_DATA_VERSION);
@@ -43,35 +34,21 @@ public final class PlayerDiary {
         sortChronologically();
     }
 
-    public void clear() {
-        entries.clear();
-        automaticEventState.clear();
-    }
+    public void clear() { entries.clear(); automaticEventState.clear(); }
 
     public Optional<DiaryEntry> findEntry(UUID entryId) {
-        if (entryId == null) {
-            return Optional.empty();
-        }
-
-        return entries.stream()
-                .filter(entry -> entryId.equals(entry.getId()))
-                .findFirst();
+        if (entryId == null) return Optional.empty();
+        return entries.stream().filter(entry -> entryId.equals(entry.getId())).findFirst();
     }
 
     public Optional<DiaryEntry> findLastEntry() {
-        if (entries.isEmpty()) {
-            return Optional.empty();
-        }
-
+        if (entries.isEmpty()) return Optional.empty();
         sortChronologically();
         return Optional.of(entries.get(entries.size() - 1));
     }
 
     public boolean hasEntryWithEventType(String eventType) {
-        if (eventType == null || eventType.isBlank()) {
-            return false;
-        }
-
+        if (eventType == null || eventType.isBlank()) return false;
         return entries.stream().anyMatch(entry -> eventType.equals(entry.getEventType()));
     }
 
@@ -91,17 +68,9 @@ public final class PlayerDiary {
         return entry;
     }
 
-    public int getDataVersion() {
-        return dataVersion;
-    }
-
-    public UUID getPlayerUuid() {
-        return playerUuid;
-    }
-
-    public List<DiaryEntry> entriesView() {
-        return List.copyOf(entries);
-    }
+    public int getDataVersion() { return dataVersion; }
+    public UUID getPlayerUuid() { return playerUuid; }
+    public List<DiaryEntry> entriesView() { return List.copyOf(entries); }
 
     public AutomaticEventState automaticEventState() {
         automaticEventState = automaticEventState == null ? new AutomaticEventState() : automaticEventState;
@@ -109,7 +78,22 @@ public final class PlayerDiary {
         return automaticEventState;
     }
 
+    /**
+     * Chapter-aware ordering is deterministic and independent of unlock time.
+     * Entries without chapter metadata remain in the general section after the
+     * chaptered research. Within a chapter, the chapter marker is first and the
+     * research entries keep their original creation order.
+     */
     private void sortChronologically() {
-        entries.sort(Comparator.comparing(DiaryEntry::getCreatedAt));
+        entries.sort(Comparator
+                .comparingInt((DiaryEntry entry) -> entry.getChapterOrder())
+                .thenComparingInt(entry -> isChapterMarker(entry) ? 0 : 1)
+                .thenComparing(DiaryEntry::getCreatedAt)
+                .thenComparing(entry -> entry.getResolvedTitle(), String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(DiaryEntry::getId));
+    }
+
+    private static boolean isChapterMarker(DiaryEntry entry) {
+        return DiaryEntryMarkers.isChapterEntry(entry);
     }
 }

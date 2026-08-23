@@ -11,14 +11,10 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * Keeps the diary UI grouped by the chapter metadata stored on each entry.
- * The normal date/importance sorting must never be allowed to move an entry
- * across chapter boundaries.
- */
+/** Keeps the diary UI grouped by the chapter metadata stored on each entry. */
 @Mixin(DiaryScreen.class)
 public abstract class DiaryScreenChapterSortMixin {
-    @Inject(method = "filteredEntries", at = @At("RETURN"), cancellable = true)
+    @Inject(method = "filteredEntries", at = @At("RETURN"), cancellable = true, remap = false)
     private void dearDiary$groupEntriesByChapter(CallbackInfoReturnable<List<DiaryEntry>> cir) {
         List<DiaryEntry> entries = new ArrayList<>(cir.getReturnValue());
 

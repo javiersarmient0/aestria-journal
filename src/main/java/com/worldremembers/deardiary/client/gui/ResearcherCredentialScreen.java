@@ -7,7 +7,12 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
 public final class ResearcherCredentialScreen extends Screen {
-    private static final Identifier TEXTURE = Identifier.of(DearDiaryMod.MOD_ID, "textures/gui/diary_book.png");
+    private static final Identifier TEXTURE = Identifier.of(DearDiaryMod.MOD_ID, "textures/gui/credencial.png");
+    private static final int TEXTURE_WIDTH = 103;
+    private static final int TEXTURE_HEIGHT = 123;
+    private static final int DISPLAY_HEIGHT = 360;
+    private static final int DISPLAY_WIDTH = Math.round((float) TEXTURE_WIDTH * DISPLAY_HEIGHT / TEXTURE_HEIGHT);
+
     private final String playerName;
 
     public ResearcherCredentialScreen(String playerName) {
@@ -19,19 +24,17 @@ public final class ResearcherCredentialScreen extends Screen {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         this.renderBackground(context, mouseX, mouseY, delta);
 
-        int width = 320;
-        int height = 220;
-        int x = (this.width - width) / 2;
-        int y = (this.height - height) / 2;
+        int x = (this.width - DISPLAY_WIDTH) / 2;
+        int y = (this.height - DISPLAY_HEIGHT) / 2;
 
-        // Prototipo: reutilizamos la textura del libro para validar el flujo completo.
-        context.drawTexture(TEXTURE, x, y, 0, 0, width, height, width, height);
+        // Prototipo: mostramos la credencial respetando su proporción original de 103x123.
+        context.drawTexture(TEXTURE, x, y, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT);
         context.drawCenteredTextWithShadow(this.textRenderer,
                 Text.translatable("screen.dear_diary.researcher_credential.title"),
-                this.width / 2, y + 14, 0xFFFFFF);
+                this.width / 2, y + 12, 0xFFFFFF);
         context.drawCenteredTextWithShadow(this.textRenderer,
                 Text.translatable("screen.dear_diary.researcher_credential.name", playerName),
-                this.width / 2, y + height - 30, 0xFFFFFF);
+                this.width / 2, y + DISPLAY_HEIGHT - 24, 0xFFFFFF);
 
         super.render(context, mouseX, mouseY, delta);
     }

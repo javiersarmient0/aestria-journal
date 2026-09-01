@@ -119,7 +119,6 @@ public final class DearDiaryNetworking {
         }
     }
 
-    /** Reutiliza la notificación visual nativa de Dear Diary para investigaciones de Aestria. */
     public static void sendResearchEntryNotice(ServerPlayerEntity player, DiaryEntry entry) {
         if (ServerPlayNetworking.canSend(player, NewResearchEntryPayload.ID)) {
             ServerPlayNetworking.send(player, NewResearchEntryPayload.fromEntry(entry));
@@ -141,7 +140,7 @@ public final class DearDiaryNetworking {
             return false;
         }
 
-        ServerPlayNetworking.send(player, new OpenResearcherCredentialPayload(player.getGameProfile().name()));
+        ServerPlayNetworking.send(player, new OpenResearcherCredentialPayload(player.getGameProfile().getName()));
         return true;
     }
 }

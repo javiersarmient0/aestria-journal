@@ -66,5 +66,8 @@
   "chat.dear_diary.share.header": "%s %s comparte un recuerdo:",
   "chat.dear_diary.dimension.overworld": "Mundo normal",
   "chat.dear_diary.dimension.nether": "Nether",
-  "chat.dear_diary.dimension.end": "End"
+  "chat.dear_diary.dimension.end": "End",
+  "item.dear_diary.researcher_credential": "Credencial del Investigador",
+  "screen.dear_diary.researcher_credential.title": "Credencial del Investigador",
+  "screen.dear_diary.researcher_credential.name": "Investigador: %s"
 }

@@ -10,8 +10,6 @@ public final class ResearcherCredentialScreen extends Screen {
     private static final Identifier TEXTURE = Identifier.of(DearDiaryMod.MOD_ID, "textures/gui/credencial.png");
     private static final int TEXTURE_WIDTH = 103;
     private static final int TEXTURE_HEIGHT = 123;
-    private static final int DISPLAY_WIDTH = 309;
-    private static final int DISPLAY_HEIGHT = 369;
 
     private final String playerName;
 
@@ -24,33 +22,17 @@ public final class ResearcherCredentialScreen extends Screen {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         this.renderBackground(context, mouseX, mouseY, delta);
 
-        int x = (this.width - DISPLAY_WIDTH) / 2;
-        int y = (this.height - DISPLAY_HEIGHT) / 2;
+        // Primera prueba: dibujar la PNG a su tamaño nativo para evitar que
+        // Minecraft repita la textura o la deforme por un escalado incorrecto.
+        int x = (this.width - TEXTURE_WIDTH) / 2;
+        int y = (this.height - TEXTURE_HEIGHT) / 2;
 
-        // Renderizamos la imagen completa como una única textura, manteniendo exactamente
-        // la proporción 103:123 de la credencial. No se utiliza la textura del Diario.
         context.drawTexture(
                 TEXTURE,
                 x, y,
                 0, 0,
-                DISPLAY_WIDTH, DISPLAY_HEIGHT,
+                TEXTURE_WIDTH, TEXTURE_HEIGHT,
                 TEXTURE_WIDTH, TEXTURE_HEIGHT
-        );
-
-        context.drawCenteredTextWithShadow(
-                this.textRenderer,
-                Text.translatable("screen.dear_diary.researcher_credential.title"),
-                this.width / 2,
-                y + DISPLAY_HEIGHT + 8,
-                0xFFFFFF
-        );
-
-        context.drawCenteredTextWithShadow(
-                this.textRenderer,
-                Text.translatable("screen.dear_diary.researcher_credential.name", playerName),
-                this.width / 2,
-                y + DISPLAY_HEIGHT + 22,
-                0xFFFFFF
         );
 
         super.render(context, mouseX, mouseY, delta);

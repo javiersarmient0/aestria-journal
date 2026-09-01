@@ -10,6 +10,7 @@ import com.worldremembers.deardiary.network.payload.EditEntryPayload;
 import com.worldremembers.deardiary.network.payload.NewAutomaticEntryPayload;
 import com.worldremembers.deardiary.network.payload.NewResearchEntryPayload;
 import com.worldremembers.deardiary.network.payload.OpenDiaryScreenPayload;
+import com.worldremembers.deardiary.network.payload.OpenResearcherCredentialPayload;
 import com.worldremembers.deardiary.network.payload.RequestDiaryPayload;
 import com.worldremembers.deardiary.network.payload.SetFavoritePayload;
 import com.worldremembers.deardiary.network.payload.ShareEntryPayload;
@@ -46,6 +47,7 @@ public final class DearDiaryNetworking {
         PayloadTypeRegistry.playS2C().register(NewAutomaticEntryPayload.ID, NewAutomaticEntryPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(NewResearchEntryPayload.ID, NewResearchEntryPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(OpenDiaryScreenPayload.ID, OpenDiaryScreenPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(OpenResearcherCredentialPayload.ID, OpenResearcherCredentialPayload.CODEC);
     }
 
     private static void registerServerReceivers() {
@@ -131,6 +133,15 @@ public final class DearDiaryNetworking {
 
         ServerPlayNetworking.send(player, new OpenDiaryScreenPayload(newEntry));
         sendDiarySnapshot(player);
+        return true;
+    }
+
+    public static boolean openResearcherCredential(ServerPlayerEntity player) {
+        if (!ServerPlayNetworking.canSend(player, OpenResearcherCredentialPayload.ID)) {
+            return false;
+        }
+
+        ServerPlayNetworking.send(player, new OpenResearcherCredentialPayload(player.getGameProfile().name()));
         return true;
     }
 }

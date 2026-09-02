@@ -25,18 +25,24 @@ public final class ResearcherCredentialScreen extends Screen {
         // Keep Minecraft's normal blurred world background.
         this.renderBackground(context, mouseX, mouseY, delta);
 
-        // Draw the 103x123 source texture at an exact 2x scale, centered.
-        // The source UV size remains 103x123 so the texture is never repeated.
+        // Render the native 103x123 texture and scale the matrix exactly 2x.
+        // This avoids asking the texture draw call to resample the image.
         int x = (this.width - DISPLAY_WIDTH) / 2;
         int y = (this.height - DISPLAY_HEIGHT) / 2;
 
+        context.getMatrices().push();
+        context.getMatrices().translate(x, y, 0);
+        context.getMatrices().scale(2.0f, 2.0f, 1.0f);
+
         context.drawTexture(
                 TEXTURE,
-                x, y,
                 0, 0,
-                DISPLAY_WIDTH, DISPLAY_HEIGHT,
+                0, 0,
+                TEXTURE_WIDTH, TEXTURE_HEIGHT,
                 TEXTURE_WIDTH, TEXTURE_HEIGHT
         );
+
+        context.getMatrices().pop();
 
         super.render(context, mouseX, mouseY, delta);
     }

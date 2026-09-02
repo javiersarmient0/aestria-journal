@@ -1,5 +1,6 @@
 package com.worldremembers.deardiary.client.gui;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.worldremembers.deardiary.DearDiaryMod;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -22,27 +23,32 @@ public final class ResearcherCredentialScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Keep Minecraft's normal blurred world background.
+        // Keep the normal Minecraft blurred world background.
         this.renderBackground(context, mouseX, mouseY, delta);
 
-        // Render the native 103x123 texture and scale the matrix exactly 2x.
-        // This avoids asking the texture draw call to resample the image.
         int x = (this.width - DISPLAY_WIDTH) / 2;
         int y = (this.height - DISPLAY_HEIGHT) / 2;
 
-        context.getMatrices().push();
-        context.getMatrices().translate(x, y, 0);
-        context.getMatrices().scale(2.0f, 2.0f, 1.0f);
+        // Use the same drawTexture overload and rendering setup as the Diary.
+        // The source rectangle is the complete native texture, while the
+        // destination is exactly 2x the original 103x123 size.
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
 
         context.drawTexture(
                 TEXTURE,
-                0, 0,
-                0, 0,
-                TEXTURE_WIDTH, TEXTURE_HEIGHT,
-                TEXTURE_WIDTH, TEXTURE_HEIGHT
+                x,
+                y,
+                DISPLAY_WIDTH,
+                DISPLAY_HEIGHT,
+                0.0F,
+                0.0F,
+                TEXTURE_WIDTH,
+                TEXTURE_HEIGHT,
+                TEXTURE_WIDTH,
+                TEXTURE_HEIGHT
         );
-
-        context.getMatrices().pop();
 
         super.render(context, mouseX, mouseY, delta);
     }

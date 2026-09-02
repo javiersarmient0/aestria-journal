@@ -82,6 +82,9 @@ public final class AestriaJournalCommands {
                         }))
                 .then(CommandManager.literal("limpiar").requires(AestriaJournalCommands::isOperator)
                         .executes(context -> clearSelf(context.getSource()))));
+
+        dispatcher.register(CommandManager.literal("credencial")
+                .executes(context -> openCredential(context.getSource())));
     }
 
     private static boolean isOperator(ServerCommandSource source) { return source.hasPermissionLevel(2); }
@@ -92,6 +95,18 @@ public final class AestriaJournalCommands {
             return 0;
         }
         return DearDiaryNetworking.openDiaryScreen(player, newEntry) ? 1 : 0;
+    }
+
+    private static int openCredential(ServerCommandSource source) {
+        if (!(source.getEntity() instanceof ServerPlayerEntity player)) {
+            source.sendError(Text.literal("Este comando solo puede usarse dentro del juego."));
+            return 0;
+        }
+        if (!DearDiaryNetworking.openResearcherCredential(player)) {
+            source.sendError(Text.literal("La credencial no está disponible para este cliente."));
+            return 0;
+        }
+        return 1;
     }
 
     private static int clearSelf(ServerCommandSource source) {

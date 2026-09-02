@@ -4,7 +4,6 @@ import com.worldremembers.deardiary.command.AestriaJournalCommands;
 import com.worldremembers.deardiary.compat.fabric.FabricCompatBootstrap;
 import com.worldremembers.deardiary.config.DearDiaryConfigManager;
 import com.worldremembers.deardiary.api.AestriaJournalApi;
-import com.worldremembers.deardiary.item.ResearcherCredentialItem;
 import com.worldremembers.deardiary.network.DearDiaryNetworking;
 import com.worldremembers.deardiary.storage.DiaryBackupManager;
 import com.worldremembers.deardiary.storage.JsonDiaryStorage;
@@ -15,10 +14,6 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.item.Item;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.util.Identifier;
 import net.minecraft.util.WorldSavePath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,12 +22,6 @@ public final class DearDiaryMod implements ModInitializer {
     public static final String MOD_ID = "dear_diary";
     public static final String MOD_NAME = "Diario de Investigador";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-
-    public static final Item RESEARCHER_CREDENTIAL = Registry.register(
-            Registries.ITEM,
-            Identifier.of(MOD_ID, "researcher_credential"),
-            new ResearcherCredentialItem(new Item.Settings().maxCount(1))
-    );
 
     @Override
     public void onInitialize() {
@@ -48,7 +37,7 @@ public final class DearDiaryMod implements ModInitializer {
         FabricCompatBootstrap.register();
         configManager.writeSupportFiles();
         // El comando original /deardiary queda deshabilitado para que la interfaz pública
-        // del mod sea únicamente /diario y no exponga comandos internos en inglés.
+        // del mod sea únicamente /diario y /credencial y no exponga comandos internos en inglés.
         AestriaJournalCommands.register();
 
         ServerLifecycleEvents.SERVER_STARTING.register(server -> {

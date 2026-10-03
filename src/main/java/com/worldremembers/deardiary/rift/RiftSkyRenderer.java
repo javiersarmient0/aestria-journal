@@ -1,9 +1,9 @@
 package com.worldremembers.deardiary.rift;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.Tessellator;
-import com.mojang.blaze3d.vertex.VertexBuffer;
+import net.minecraft.client.render.BufferBuilder;
+import net.minecraft.client.render.Tessellator;
+import net.minecraft.client.gl.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
@@ -56,7 +56,7 @@ public final class RiftSkyRenderer {
 
         VertexBuffer buffer = cube();
         buffer.bind();
-        buffer.drawWithShader(modelView, projection, shader);
+        buffer.draw(modelView, projection, shader);
         VertexBuffer.unbind();
 
         RenderSystem.enableCull();

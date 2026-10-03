@@ -27,7 +27,7 @@ public final class RiftSkyRenderer {
     public static void register() {
         CoreShaderRegistrationCallback.EVENT.register(context -> context.register(
                 Identifier.of("dear_diary", "rift_sky"), VertexFormats.POSITION, program -> shader = program));
-        WorldRenderEvents.AFTER_ENTITIES.register(RiftSkyRenderer::render);
+        WorldRenderEvents.BEFORE_ENTITIES.register(RiftSkyRenderer::render);
     }
 
     private static void render(WorldRenderContext context) {
@@ -45,11 +45,12 @@ public final class RiftSkyRenderer {
             modelOffset.set(ClientRiftState.fade, ClientRiftState.seed, ClientRiftState.sweep);
         }
 
-        Matrix4f modelView = new Matrix4f(context.matrixStack().peek().getPositionMatrix());
+        Matrix4f modelView = new Matrix4f(context.positionMatrix());
         Matrix4f projection = new Matrix4f(context.projectionMatrix());
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-        RenderSystem.disableDepthTest();
+        RenderSystem.enableDepthTest();
+        RenderSystem.depthFunc(GL11.GL_LEQUAL);
         RenderSystem.depthMask(false);
         RenderSystem.disableCull();
 

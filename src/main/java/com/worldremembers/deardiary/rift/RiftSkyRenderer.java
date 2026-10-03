@@ -12,9 +12,9 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.ShaderProgram;
 import net.minecraft.client.render.VertexFormats;
 import net.minecraft.util.Identifier;
-import net.minecraft.world.effect.StatusEffects;
-import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.client.render.CameraSubmersionType;
+import net.minecraft.entity.LivingEntity;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
 

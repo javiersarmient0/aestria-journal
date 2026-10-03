@@ -13,14 +13,16 @@ public final class RiftTimeline {
     public static final float OPEN_END_SECONDS = OPEN_START_SECONDS + OPEN_SECONDS;
 
     public static final float FADE_OUT_SECONDS = 4.0F;
-
     private static final long FADE_OUT_TICKS = (long) (FADE_OUT_SECONDS * TICKS_PER_SECOND);
 
     private RiftTimeline() {}
 
+    /**
+     * Opening geometry follows the original Dedsafio timeline, but once the
+     * rift is fully open it remains open indefinitely. The shader time itself
+     * is never clamped, so all procedural animation keeps moving.
+     */
     public static float phase(float seconds) {
-        // Conserva la animación original de apertura y, una vez abierta,
-        // mantiene la brecha completamente abierta hasta /brecha detener.
         return Math.min(seconds, OPEN_END_SECONDS);
     }
 
@@ -45,8 +47,8 @@ public final class RiftTimeline {
     public static float fade(long nowTick, float partialTick, long stopTick) {
         if (stopTick < 0) return 1.0F;
 
-        float seconds = (nowTick - stopTick + partialTick) / TICKS_PER_SECOND;
-        return 1.0F - clamp01(seconds / FADE_OUT_SECONDS);
+        float secondsSinceStop = (nowTick - stopTick + partialTick) / TICKS_PER_SECOND;
+        return 1.0F - clamp01(secondsSinceStop / FADE_OUT_SECONDS);
     }
 
     public static boolean isRunning(long nowTick, long startTick, long stopTick) {

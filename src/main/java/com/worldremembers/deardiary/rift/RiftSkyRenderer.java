@@ -41,7 +41,11 @@ public final class RiftSkyRenderer {
 
         if (!ClientRiftState.update(client.getRenderTickCounter().getTickDelta(false))) return;
 
-        shader.getUniform("ColorModulator").set(
+        // The original Dedsafio renderer feeds the shader's ColorModulator
+        // through RenderSystem. This is important on 1.21.1: setting the
+        // ShaderProgram uniform directly bypasses the render-system color state
+        // used by the core shader and makes the opening parameters appear stuck.
+        RenderSystem.setShaderColor(
                 ClientRiftState.seconds,
                 ClientRiftState.spread,
                 ClientRiftState.line,
@@ -66,6 +70,7 @@ public final class RiftSkyRenderer {
         RenderSystem.enableCull();
         RenderSystem.depthMask(true);
         RenderSystem.disableBlend();
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     private static boolean skyHidden(MinecraftClient client) {

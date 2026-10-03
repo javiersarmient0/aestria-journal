@@ -7,6 +7,8 @@ import net.minecraft.world.World;
 public final class ClientRiftState {
     private static RiftSyncPayload state = RiftSyncPayload.NONE;
 
+    // seconds is the real elapsed shader time. It must continue increasing
+    // after the opening reaches its maximum so the procedural shader never freezes.
     static float seconds;
     static float spread;
     static float sweep;
@@ -33,14 +35,23 @@ public final class ClientRiftState {
         long now = world.getTime();
         if (!RiftTimeline.isVisible(now, state.startTick(), state.stopTick())) return false;
 
-        seconds = Math.max(0.0F, (now - state.startTick() + partialTick) / RiftTimeline.TICKS_PER_SECOND);
+        // This value is intentionally NOT clamped. The original shader uses it
+        // as its animation clock for the vortex, stars, heartbeat, edge noise, etc.
+        seconds = Math.max(
+                0.0F,
+                (now - state.startTick() + partialTick) / RiftTimeline.TICKS_PER_SECOND);
+
+        // Only the opening geometry is clamped. Once fully open, the geometry
+        // stays open while 'seconds' continues to animate the shader.
         float phase = RiftTimeline.phase(seconds);
+
         spread = RiftTimeline.spread(phase);
         sweep = RiftTimeline.sweep(phase);
         line = RiftTimeline.line(phase);
         open = RiftTimeline.open(phase);
         fade = RiftTimeline.fade(now, partialTick, state.stopTick());
         seed = (state.seed() & 0xFFFF) / 65536.0F;
+
         return fade > 0.0F;
     }
 

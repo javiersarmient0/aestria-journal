@@ -14,14 +14,13 @@ public final class RiftTimeline {
     public static final float END_SECONDS = REVERSE_START_SECONDS + OPEN_END_SECONDS;
     public static final float FADE_OUT_SECONDS = 4.0F;
 
-    private static final long END_TICKS = (long) (END_SECONDS * TICKS_PER_SECOND);
     private static final long FADE_OUT_TICKS = (long) (FADE_OUT_SECONDS * TICKS_PER_SECOND);
 
     private RiftTimeline() {}
 
     public static float phase(float seconds) {
-        if (seconds < REVERSE_START_SECONDS) return Math.min(seconds, OPEN_END_SECONDS);
-        return Math.max(0.0F, END_SECONDS - seconds);
+        // Una vez abierta, la brecha permanece completamente abierta hasta /brecha detener.
+        return Math.min(seconds, OPEN_END_SECONDS);
     }
 
     public static float spread(float phase) {
@@ -49,11 +48,11 @@ public final class RiftTimeline {
     }
 
     public static boolean isRunning(long nowTick, long startTick, long stopTick) {
-        return startTick >= 0 && stopTick < 0 && nowTick - startTick < END_TICKS;
+        return startTick >= 0 && stopTick < 0;
     }
 
     public static boolean isVisible(long nowTick, long startTick, long stopTick) {
-        if (startTick < 0 || nowTick - startTick >= END_TICKS) return false;
+        if (startTick < 0) return false;
         return stopTick < 0 || nowTick - stopTick < FADE_OUT_TICKS;
     }
 

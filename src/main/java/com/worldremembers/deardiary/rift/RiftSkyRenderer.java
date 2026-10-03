@@ -49,8 +49,7 @@ public final class RiftSkyRenderer {
         Matrix4f projection = new Matrix4f(context.projectionMatrix());
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthFunc(GL11.GL_LEQUAL);
+        RenderSystem.disableDepthTest();
         RenderSystem.depthMask(false);
         RenderSystem.disableCull();
 
@@ -60,6 +59,7 @@ public final class RiftSkyRenderer {
         VertexBuffer.unbind();
 
         RenderSystem.enableCull();
+        RenderSystem.enableDepthTest();
         RenderSystem.depthMask(true);
         RenderSystem.disableBlend();
     }

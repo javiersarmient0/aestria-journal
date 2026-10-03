@@ -2,16 +2,16 @@ package com.worldremembers.deardiary.rift;
 
 public final class RiftTimeline {
     public static final float TICKS_PER_SECOND = 20.0F;
+
     public static final float SPREAD_SECONDS = 8.0F;
     public static final float SWEEP_SECONDS = 3.0F;
+
     public static final float LINE_START_SECONDS = 11.0F;
     public static final float LINE_SECONDS = 2.5F;
     public static final float OPEN_START_SECONDS = 13.5F;
     public static final float OPEN_SECONDS = 8.0F;
     public static final float OPEN_END_SECONDS = OPEN_START_SECONDS + OPEN_SECONDS;
-    public static final float HOLD_SECONDS = 10.0F;
-    public static final float REVERSE_START_SECONDS = OPEN_END_SECONDS + HOLD_SECONDS;
-    public static final float END_SECONDS = REVERSE_START_SECONDS + OPEN_END_SECONDS;
+
     public static final float FADE_OUT_SECONDS = 4.0F;
 
     private static final long FADE_OUT_TICKS = (long) (FADE_OUT_SECONDS * TICKS_PER_SECOND);
@@ -19,7 +19,8 @@ public final class RiftTimeline {
     private RiftTimeline() {}
 
     public static float phase(float seconds) {
-        // Una vez abierta, la brecha permanece completamente abierta hasta /brecha detener.
+        // Conserva la animación original de apertura y, una vez abierta,
+        // mantiene la brecha completamente abierta hasta /brecha detener.
         return Math.min(seconds, OPEN_END_SECONDS);
     }
 
@@ -43,6 +44,7 @@ public final class RiftTimeline {
 
     public static float fade(long nowTick, float partialTick, long stopTick) {
         if (stopTick < 0) return 1.0F;
+
         float seconds = (nowTick - stopTick + partialTick) / TICKS_PER_SECOND;
         return 1.0F - clamp01(seconds / FADE_OUT_SECONDS);
     }

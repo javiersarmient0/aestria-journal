@@ -36,8 +36,6 @@ public final class DearDiaryMod implements ModInitializer {
         DearDiaryNetworking.register();
         FabricCompatBootstrap.register();
         configManager.writeSupportFiles();
-        // El comando original /deardiary queda deshabilitado para que la interfaz pública
-        // del mod sea únicamente /diario y /credencial y no exponga comandos internos en inglés.
         AestriaJournalCommands.register();
 
         ServerLifecycleEvents.SERVER_STARTING.register(server -> {

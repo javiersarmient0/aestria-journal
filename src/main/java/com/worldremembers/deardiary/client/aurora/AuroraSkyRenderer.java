@@ -61,8 +61,8 @@ public final class AuroraSkyRenderer {
         var cameraPos = context.camera().getPos();
         if (anchoredWorld != context.world()) {
             anchoredWorld = context.world();
-            anchorX = Math.floor(cameraPos.x / 256.0 + 0.5) * 256.0;
-            anchorZ = Math.floor(cameraPos.z / 256.0 + 0.5) * 256.0;
+            anchorX = Math.floor(cameraPos.x / 128.0 + 0.5) * 128.0;
+            anchorZ = Math.floor(cameraPos.z / 128.0 + 0.5) * 128.0;
         }
 
         double cameraX = cameraPos.x;

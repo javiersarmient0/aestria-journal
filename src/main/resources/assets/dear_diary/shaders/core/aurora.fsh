@@ -52,7 +52,8 @@ void main() {
 
     float veilNoise = fbm(ring * 7.0 + vec2(t * 0.025 + bend, uv.y * 3.0 - t * 0.02));
     float filamentWave = 0.5 + 0.5 * sin((angle * 46.0 + bend * 18.0 + t * 0.11) * 6.2831853);
-    float filaments = pow(max(filamentWave, 0.0), 8.0);
+    // A higher exponent narrows the bright filament cores without changing the veil.
+    float filaments = pow(max(filamentWave, 0.0), 14.0);
     float wisps = smoothstep(0.34, 0.78, veilNoise);
     float intensity = 0.12 + wisps * 0.26 + filaments * (0.18 + wisps * 0.66);
 

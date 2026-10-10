@@ -4,11 +4,7 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "HandledScreenAccessor",
-    "DiaryScreenChapterSortMixin",
-    "RiftWorldRendererMixin",
-    "RiftBackgroundRendererMixin",
-    "RiftClientWorldMixin",
-    "RiftSodiumCloudRendererMixin"
+    "DiaryScreenChapterSortMixin"
   ],
   "injectors": {
     "defaultRequire": 1

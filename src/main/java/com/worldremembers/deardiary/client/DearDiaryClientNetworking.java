@@ -2,7 +2,6 @@ package com.worldremembers.deardiary.client;
 
 import com.worldremembers.deardiary.DearDiaryMod;
 import com.worldremembers.deardiary.client.gui.DiaryScreen;
-import com.worldremembers.deardiary.client.gui.ResearcherCredentialScreen;
 import com.worldremembers.deardiary.network.payload.CreateManualEntryPayload;
 import com.worldremembers.deardiary.network.payload.DeleteEntryPayload;
 import com.worldremembers.deardiary.network.payload.DiarySnapshotPayload;
@@ -10,7 +9,6 @@ import com.worldremembers.deardiary.network.payload.EditEntryPayload;
 import com.worldremembers.deardiary.network.payload.NewAutomaticEntryPayload;
 import com.worldremembers.deardiary.network.payload.NewResearchEntryPayload;
 import com.worldremembers.deardiary.network.payload.OpenDiaryScreenPayload;
-import com.worldremembers.deardiary.network.payload.OpenResearcherCredentialPayload;
 import com.worldremembers.deardiary.network.payload.RequestDiaryPayload;
 import com.worldremembers.deardiary.network.payload.SetFavoritePayload;
 import com.worldremembers.deardiary.network.payload.ShareEntryPayload;
@@ -54,8 +52,6 @@ public final class DearDiaryClientNetworking {
             }
         });
 
-        ClientPlayNetworking.registerGlobalReceiver(OpenResearcherCredentialPayload.ID, (payload, context) ->
-                context.client().setScreen(new ResearcherCredentialScreen(payload.playerName())));
     }
 
     public static void requestDiarySnapshot() {

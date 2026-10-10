@@ -82,10 +82,10 @@ public final class AuroraSkyRenderer {
             double y0 = center + wave0;
             double y1 = center + wave1;
 
-            Vec3d p00 = skyPoint(camera, x0, y0 - width, phase);
-            Vec3d p01 = skyPoint(camera, x0, y0 + width, phase);
-            Vec3d p10 = skyPoint(camera, x1, y1 + width, phase);
-            Vec3d p11 = skyPoint(camera, x1, y1 - width, phase);
+            Vec3d p00 = skyPoint(x0, y0 - width, phase);
+            Vec3d p01 = skyPoint(x0, y0 + width, phase);
+            Vec3d p10 = skyPoint(x1, y1 + width, phase);
+            Vec3d p11 = skyPoint(x1, y1 - width, phase);
 
             float blend = (float) (0.5 + 0.5 * Math.sin((a0 * 3.0 + ribbon * 0.19) * Math.PI));
             int red = Math.round(12 + 12 * blend);
@@ -100,14 +100,14 @@ public final class AuroraSkyRenderer {
         }
     }
 
-    private static Vec3d skyPoint(Vec3d camera, double horizontal, double vertical, double phase) {
+    private static Vec3d skyPoint(double horizontal, double vertical, double phase) {
         double angle = horizontal * 1.42 + phase * 0.12;
         double y = vertical * SKY_RADIUS * 0.52 + 38.0;
         double radius = SKY_RADIUS * Math.sqrt(Math.max(0.15, 1.0 - vertical * vertical * 0.13));
         return new Vec3d(
-                camera.x + Math.sin(angle) * radius,
-                camera.y + y,
-                camera.z + Math.cos(angle) * radius
+                Math.sin(angle) * radius,
+                y,
+                Math.cos(angle) * radius
         );
     }
 

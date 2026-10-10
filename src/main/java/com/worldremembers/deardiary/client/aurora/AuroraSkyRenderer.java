@@ -28,7 +28,8 @@ public final class AuroraSkyRenderer {
     }
 
     public static void register() {
-        WorldRenderEvents.AFTER_SKY.register(AuroraSkyRenderer::render);
+        // AFTER_SKY is not part of Fabric API 1.21.1. AFTER_ENTITIES provides a matrix stack.
+        WorldRenderEvents.AFTER_ENTITIES.register(AuroraSkyRenderer::render);
     }
 
     private static void render(WorldRenderContext context) {

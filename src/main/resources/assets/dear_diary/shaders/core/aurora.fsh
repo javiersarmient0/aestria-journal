@@ -4,10 +4,10 @@ in vec2 texCoord0;
 in vec4 vertexColor;
 
 uniform float GameTime;
+uniform mat4 InvProjMat;
+uniform mat4 InvModelViewMat;
 
 out vec4 fragColor;
-
-const float TAU = 6.28318530718;
 
 float hash(vec2 p) {
     p = fract(p * vec2(123.34, 456.21));
@@ -27,52 +27,60 @@ float noise(vec2 p) {
 }
 
 float fbm(vec2 p) {
-    float value = 0.0;
+    float sum = 0.0;
     float amplitude = 0.5;
-    for (int i = 0; i < 4; i++) {
-        value += noise(p) * amplitude;
-        p = p * 2.03 + vec2(17.1, 9.2);
+    for (int i = 0; i < 5; i++) {
+        sum += noise(p) * amplitude;
+        p = p * 2.02 + vec2(13.7, 9.2);
         amplitude *= 0.5;
     }
-    return value;
+    return sum;
 }
 
 void main() {
-    vec2 uv = texCoord0;
+    // Reconstruct this pixel's view ray, then rotate it into world space.
+    vec2 ndc = texCoord0 * 2.0 - 1.0;
+    vec4 viewPoint = InvProjMat * vec4(ndc, 1.0, 1.0);
+    vec3 viewRay = normalize(viewPoint.xyz / max(abs(viewPoint.w), 0.0001));
+    vec3 worldRay = normalize(mat3(InvModelViewMat) * viewRay);
+
+    // The aurora exists only in the upper sky. Because this is a world-space
+    // direction, turning the camera reveals a different part of the same sky.
+    float elevation = asin(clamp(worldRay.y, -1.0, 1.0));
+    float skyMask = smoothstep(0.035, 0.12, elevation)
+                  * (1.0 - smoothstep(0.66, 0.88, elevation));
+    if (skyMask <= 0.001) {
+        fragColor = vec4(0.0);
+        return;
+    }
+
+    float azimuth = atan(worldRay.z, worldRay.x);
     float t = GameTime;
 
-    // Circular domain keeps the procedural texture continuous at the ring seam.
-    float angle = uv.x * TAU;
-    vec2 ring = vec2(cos(angle), sin(angle));
+    // Two slowly drifting noise fields form wide curtains and finer folds.
+    vec2 domain = vec2(azimuth * 4.2, elevation * 8.5);
+    float broad = fbm(domain * vec2(1.1, 1.8) + vec2(t * 0.13, -t * 0.035));
+    float detail = fbm(domain * vec2(3.7, 2.4) + vec2(-t * 0.22, t * 0.06));
+    float curtainShape = broad * 0.72 + detail * 0.28;
 
-    // Smooth, slowly moving distortion at multiple scales.
-    float broadWarp = fbm(ring * 3.0 + vec2(t * 0.035, uv.y * 2.0 - t * 0.018));
-    float fineWarp = fbm(ring * 8.0 + vec2(-t * 0.07, uv.y * 3.5 + t * 0.025));
-    float bend = (broadWarp - 0.45) * 0.16 + (fineWarp - 0.5) * 0.045;
+    float folds = 0.5 + 0.5 * sin(
+        azimuth * 58.0 + (broad - 0.5) * 13.0
+        + sin(elevation * 17.0 + t * 0.17) * 2.2
+    );
+    float filaments = pow(max(folds, 0.0), 10.0);
+    float veil = smoothstep(0.36, 0.72, curtainShape);
+    float verticalRibbons = smoothstep(0.08, 0.20, elevation + (broad - 0.5) * 0.12)
+                          * (1.0 - smoothstep(0.48, 0.67, elevation + (detail - 0.5) * 0.09));
 
-    float veilNoise = fbm(ring * 7.0 + vec2(t * 0.025 + bend, uv.y * 3.0 - t * 0.02));
-    float filamentWave = 0.5 + 0.5 * sin((angle * 46.0 + bend * 18.0 + t * 0.11) * 6.2831853);
-    // A higher exponent narrows the bright filament cores without changing the veil.
-    float filaments = pow(max(filamentWave, 0.0), 14.0);
-    float wisps = smoothstep(0.34, 0.78, veilNoise);
-    float intensity = 0.12 + wisps * 0.26 + filaments * (0.18 + wisps * 0.66);
+    float intensity = (veil * 0.38 + filaments * (0.20 + veil * 0.8))
+                    * verticalRibbons * skyMask;
+    float alpha = clamp(intensity * 0.72 * vertexColor.a, 0.0, 0.68);
 
-    // The top and bottom fade smoothly, with irregular edges instead of hard rectangles.
-    float edgeNoise = fbm(ring * 5.0 + vec2(t * 0.02, 0.7));
-    float topEdge = 0.80 + (edgeNoise - 0.5) * 0.14;
-    float bottomEdge = 0.10 + (fineWarp - 0.5) * 0.10;
-    float verticalFade = smoothstep(bottomEdge, bottomEdge + 0.20, uv.y)
-                       * (1.0 - smoothstep(topEdge - 0.14, topEdge + 0.04, uv.y));
+    vec3 deepCyan = vec3(0.025, 0.38, 0.54);
+    vec3 auroraGreen = vec3(0.08, 0.92, 0.47);
+    vec3 mint = vec3(0.48, 1.0, 0.78);
+    vec3 color = mix(deepCyan, auroraGreen, clamp(0.25 + curtainShape * 1.1, 0.0, 1.0));
+    color = mix(color, mint, clamp(filaments * 0.55, 0.0, 0.48));
 
-    float alpha = clamp(intensity * verticalFade * 0.62 * vertexColor.a, 0.0, 0.72);
-
-    vec3 cyan = vec3(0.08, 0.78, 0.72);
-    vec3 green = vec3(0.16, 0.95, 0.48);
-    vec3 pale = vec3(0.50, 0.98, 0.84);
-    float colorMix = clamp(0.20 + veilNoise * 0.82 + filaments * 0.12, 0.0, 1.0);
-    vec3 auroraColor = mix(cyan, green, colorMix);
-    auroraColor = mix(auroraColor, pale, clamp(filaments * 0.40, 0.0, 0.36));
-
-    // The core shader uses additive blending (SRC_ALPHA, ONE).
-    fragColor = vec4(auroraColor, alpha);
+    fragColor = vec4(color, alpha);
 }

@@ -5,7 +5,7 @@ in vec4 vertexColor;
 
 uniform float GameTime;
 uniform mat4 InvProjMat;
-uniform mat4 InvModelViewMat;
+uniform mat4 CameraRotation;
 uniform vec3 CameraPos;
 
 out vec4 fragColor;
@@ -42,14 +42,14 @@ void main() {
     vec2 ndc = texCoord0 * 2.0 - 1.0;
     vec4 viewPoint = InvProjMat * vec4(ndc, 1.0, 1.0);
     vec3 viewRay = normalize(viewPoint.xyz / max(abs(viewPoint.w), 0.0001));
-    vec3 rayDir = normalize(mat3(InvModelViewMat) * viewRay);
+    vec3 rayDir = normalize(mat3(CameraRotation) * viewRay);
 
     // Aurora volume bounds in world Y. Rays are sampled through this slab,
     // not projected onto a screen-facing plane or wrapped around the horizon.
     const float layerBottom = 150.0;
     const float layerTop = 260.0;
 
-    if (rayDir.y <= 0.015) {
+    if (rayDir.y <= 0.15) {
         fragColor = vec4(0.0);
         return;
     }

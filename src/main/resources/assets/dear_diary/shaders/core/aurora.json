@@ -8,11 +8,7 @@
   },
   "vertex": "dear_diary:aurora",
   "fragment": "dear_diary:aurora",
-  "attributes": [
-    "Position",
-    "UV0",
-    "Color"
-  ],
+  "attributes": ["Position", "UV0", "Color"],
   "uniforms": [
     {
       "name": "ModelViewMat",
@@ -24,7 +20,7 @@
       "name": "ProjMat",
       "type": "matrix4x4",
       "count": 16,
-      "values": [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+      "values": [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
     },
     {
       "name": "GameTime",

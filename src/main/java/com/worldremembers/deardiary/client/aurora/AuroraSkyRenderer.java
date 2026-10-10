@@ -11,13 +11,14 @@ import net.minecraft.client.render.Tessellator;
 import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
 
 /**
- * Screen-space ray-marched-style aurora. Unlike the previous ring mesh, this
- * evaluates the effect from world-space view directions, so it belongs to the
- * sky dome and changes on screen when the camera rotates.
+ * Draws an aurora volume by reconstructing world-space camera rays and
+ * sampling a high-altitude atmospheric layer. The effect is not attached to
+ * screen UVs and does not use a camera-facing world plane.
  */
 public final class AuroraSkyRenderer {
     private static final Identifier SHADER_ID = Identifier.of("dear_diary", "aurora");
@@ -32,26 +33,26 @@ public final class AuroraSkyRenderer {
                 context.register(SHADER_ID, VertexFormats.POSITION_TEXTURE_COLOR,
                         program -> auroraShader = program));
 
-        // LAST retains the world camera matrices and the completed depth buffer.
         WorldRenderEvents.LAST.register(AuroraSkyRenderer::render);
     }
 
     private static void render(WorldRenderContext context) {
-        if (context.world() == null || auroraShader == null) {
+        if (context.world() == null || context.camera() == null || auroraShader == null) {
             return;
         }
 
-        // Temporary test conditions: Overworld, at night.
+        // Overworld at night only while this effect is being tested.
         if (context.world().getDimension().hasFixedTime()
                 || context.world().getTimeOfDay() % 24000L < 12500L) {
             return;
         }
 
         float time = (context.world().getTime()
-                + context.tickCounter().getTickDelta(true)) * 0.012F;
+                + context.tickCounter().getTickDelta(true)) * 0.035F;
 
         Matrix4f inverseProjection = new Matrix4f(RenderSystem.getProjectionMatrix()).invert();
         Matrix4f inverseModelView = new Matrix4f(RenderSystem.getModelViewMatrix()).invert();
+        Vec3d cameraPos = context.camera().getPos();
 
         var gameTime = auroraShader.getUniform("GameTime");
         if (gameTime != null) {
@@ -64,6 +65,10 @@ public final class AuroraSkyRenderer {
         var invView = auroraShader.getUniform("InvModelViewMat");
         if (invView != null) {
             invView.set(inverseModelView);
+        }
+        var cameraPosition = auroraShader.getUniform("CameraPos");
+        if (cameraPosition != null) {
+            cameraPosition.set((float) cameraPos.x, (float) cameraPos.y, (float) cameraPos.z);
         }
 
         RenderSystem.enableBlend();
@@ -78,8 +83,6 @@ public final class AuroraSkyRenderer {
             BufferBuilder buffer = Tessellator.getInstance().begin(
                     VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
 
-            // A single far-plane quad. The fragment shader reconstructs a world
-            // ray per pixel; depth testing limits the overlay to visible sky.
             fullscreenVertex(buffer, -1.0F, -1.0F, 1.0F, 0.0F, 0.0F);
             fullscreenVertex(buffer, -1.0F,  1.0F, 1.0F, 0.0F, 1.0F);
             fullscreenVertex(buffer,  1.0F,  1.0F, 1.0F, 1.0F, 1.0F);

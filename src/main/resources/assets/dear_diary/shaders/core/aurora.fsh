@@ -43,59 +43,69 @@ void main() {
     vec3 viewRay = normalize(viewPoint.xyz / max(abs(viewPoint.w), 0.0001));
     vec3 worldRay = normalize(mat3(InvModelViewMat) * viewRay);
 
-    float elevation = asin(clamp(worldRay.y, -1.0, 1.0));
-    float azimuth = atan(worldRay.z, worldRay.x);
     float t = GameTime;
 
-    // Restrict the effect to the upper sky, with a soft lower edge.
-    float skyMask = smoothstep(0.015, 0.095, elevation);
-    if (skyMask <= 0.001) {
+    // Project onto a tangent plane around a fixed world-space sky direction.
+    // This avoids the azimuth singularity at the zenith and its fisheye-like
+    // stretching. The pattern is anchored to world orientation, not the reticle.
+    vec3 skyForward = normalize(vec3(0.18, 0.28, 1.0));
+    vec3 skyRight = normalize(cross(vec3(0.0, 1.0, 0.0), skyForward));
+    vec3 skyUp = normalize(cross(skyForward, skyRight));
+    float forward = dot(worldRay, skyForward);
+
+    if (forward <= 0.18 || worldRay.y <= 0.015) {
         fragColor = vec4(0.0);
         return;
     }
 
-    // Time offsets are deliberately stronger so the curtains visibly flow.
-    vec2 flowA = vec2(azimuth * 2.8 + t * 0.22, elevation * 2.4 - t * 0.12);
-    vec2 flowB = vec2(azimuth * 5.1 - t * 0.31, elevation * 5.8 + t * 0.20);
-    vec2 flowC = vec2(azimuth * 11.0 + t * 0.42, elevation * 9.0 - t * 0.28);
+    vec2 skyCoord = vec2(
+        dot(worldRay, skyRight) / forward,
+        dot(worldRay, skyUp) / forward
+    );
 
-    float broad = fbm(flowA);
-    float patchField = fbm(flowB);
-    float detailField = fbm(flowC);
+    // Keep a broad sky region and fade the boundaries, instead of wrapping
+    // the effect into a full ring around the horizon.
+    float regionMask = (1.0 - smoothstep(1.25, 1.65, abs(skyCoord.x)))
+                     * smoothstep(-0.02, 0.10, skyCoord.y)
+                     * (1.0 - smoothstep(1.10, 1.45, skyCoord.y));
 
-    // Large separated curtains, but with enough coverage to remain visible.
-    float patches = smoothstep(0.34, 0.53, broad);
-    patches *= smoothstep(0.31, 0.54, patchField);
+    if (regionMask <= 0.001) {
+        fragColor = vec4(0.0);
+        return;
+    }
 
-    // The bottom and top edges vary with azimuth, avoiding a uniform ring.
-    float edgeNoise = fbm(vec2(azimuth * 2.2 - t * 0.09, 2.3));
-    float lowerEdge = 0.045 + edgeNoise * 0.13;
-    float upperEdge = 0.40 + fbm(vec2(azimuth * 2.0 + t * 0.07, 5.4)) * 0.48;
-    float lowerMask = smoothstep(lowerEdge, lowerEdge + 0.11, elevation);
-    float upperMask = 1.0 - smoothstep(upperEdge, upperEdge + 0.16, elevation);
+    // Animated domain warping creates tall, narrow folds that flow sideways.
+    float warp = fbm(vec2(skyCoord.x * 2.6 - t * 0.10, skyCoord.y * 2.1 + t * 0.045));
+    float broad = fbm(vec2(skyCoord.x * 3.2 + t * 0.16, skyCoord.y * 1.8 - t * 0.08));
+    float detail = fbm(vec2(skyCoord.x * 8.5 - t * 0.24, skyCoord.y * 5.4 + t * 0.14));
+
+    float xWarped = skyCoord.x * 24.0
+                  + (warp - 0.5) * 7.5
+                  + sin(skyCoord.y * 8.0 - t * 0.25) * 1.6;
+    float folds = 0.5 + 0.5 * sin(xWarped);
+    float filaments = pow(max(folds, 0.0), 10.0);
+
+    // Uneven curtain tops and bottoms vary across the width.
+    float lowerEdge = 0.12 + warp * 0.18;
+    float upperEdge = 0.48 + fbm(vec2(skyCoord.x * 2.0 + 7.0, t * 0.015)) * 0.60;
+    float lowerMask = smoothstep(lowerEdge, lowerEdge + 0.12, skyCoord.y);
+    float upperMask = 1.0 - smoothstep(upperEdge, upperEdge + 0.18, skyCoord.y);
     float heightMask = lowerMask * upperMask;
 
-    // Vertical luminous folds, distorted by animated noise.
-    float warpedAzimuth = azimuth * 58.0
-        + (broad - 0.5) * 20.0
-        + (detailField - 0.5) * 10.0
-        + sin(elevation * 14.0 - t * 0.42 + broad * 5.0) * 2.8;
-    float folds = 0.5 + 0.5 * sin(warpedAzimuth);
-    float filaments = pow(max(folds, 0.0), 9.0);
+    // Broad veils are subtle; narrow filaments carry the vertical structure.
+    float veil = smoothstep(0.40, 0.66, broad);
+    float fineVeil = smoothstep(0.42, 0.70, detail);
+    float intensity = regionMask * heightMask
+                    * (veil * 0.30 + fineVeil * 0.10
+                    + filaments * (0.18 + veil * 0.78));
 
-    float veil = smoothstep(0.36, 0.64, patchField);
-    float fineVeil = smoothstep(0.39, 0.68, detailField);
-    float intensity = patches * heightMask * skyMask
-                    * (veil * 0.52 + fineVeil * 0.22
-                    + filaments * (0.22 + veil * 0.78));
-
-    float alpha = clamp(intensity * 1.15 * vertexColor.a, 0.0, 0.78);
+    float alpha = clamp(intensity * 1.12 * vertexColor.a, 0.0, 0.72);
 
     vec3 deepCyan = vec3(0.018, 0.30, 0.50);
     vec3 auroraGreen = vec3(0.055, 0.92, 0.47);
     vec3 mint = vec3(0.55, 1.0, 0.80);
-    vec3 color = mix(deepCyan, auroraGreen, clamp(0.18 + patchField * 1.35, 0.0, 1.0));
-    color = mix(color, mint, clamp(filaments * 0.58, 0.0, 0.52));
+    vec3 color = mix(deepCyan, auroraGreen, clamp(0.20 + broad * 1.25, 0.0, 1.0));
+    color = mix(color, mint, clamp(filaments * 0.56, 0.0, 0.50));
 
     fragColor = vec4(color, alpha);
 }

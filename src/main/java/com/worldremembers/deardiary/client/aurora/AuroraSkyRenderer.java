@@ -51,7 +51,7 @@ public final class AuroraSkyRenderer {
                 + context.tickCounter().getTickDelta(true)) * 0.035F;
 
         Matrix4f inverseProjection = new Matrix4f(RenderSystem.getProjectionMatrix()).invert();
-        Matrix4f inverseModelView = new Matrix4f(RenderSystem.getModelViewMatrix()).invert();
+        Matrix4f cameraRotation = new Matrix4f().rotation(context.camera().getRotation());
         Vec3d cameraPos = context.camera().getPos();
 
         var gameTime = auroraShader.getUniform("GameTime");
@@ -62,9 +62,9 @@ public final class AuroraSkyRenderer {
         if (invProj != null) {
             invProj.set(inverseProjection);
         }
-        var invView = auroraShader.getUniform("InvModelViewMat");
-        if (invView != null) {
-            invView.set(inverseModelView);
+        var cameraRot = auroraShader.getUniform("CameraRotation");
+        if (cameraRot != null) {
+            cameraRot.set(cameraRotation);
         }
         var cameraPosition = auroraShader.getUniform("CameraPos");
         if (cameraPosition != null) {

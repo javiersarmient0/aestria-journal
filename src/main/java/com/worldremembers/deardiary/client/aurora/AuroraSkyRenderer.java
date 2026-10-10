@@ -4,7 +4,6 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.ShaderProgram;
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.BufferRenderer;
@@ -48,7 +47,6 @@ public final class AuroraSkyRenderer {
             return;
         }
 
-        MinecraftClient client = MinecraftClient.getInstance();
         float time = (context.world().getTime()
                 + context.tickCounter().getTickDelta(true)) * 0.012F;
 
@@ -69,7 +67,7 @@ public final class AuroraSkyRenderer {
         }
 
         RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
+        RenderSystem.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE);
         RenderSystem.enableDepthTest();
         RenderSystem.depthFunc(GL11.GL_LEQUAL);
         RenderSystem.depthMask(false);

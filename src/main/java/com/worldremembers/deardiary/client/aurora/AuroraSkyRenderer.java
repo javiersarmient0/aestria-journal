@@ -61,8 +61,8 @@ public final class AuroraSkyRenderer {
 
         RenderSystem.enableBlend();
         RenderSystem.disableCull();
-        // Keep depth testing enabled so terrain and nearby objects can occlude the distant curtain.
-        RenderSystem.enableDepthTest();
+        // Render as a distant sky effect, not as a world-space wall occluded by terrain.
+        RenderSystem.disableDepthTest();
         RenderSystem.depthMask(false);
 
         try {

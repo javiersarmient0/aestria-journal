@@ -7,6 +7,8 @@ uniform float GameTime;
 
 out vec4 fragColor;
 
+const float TAU = 6.28318530718;
+
 float hash(vec2 p) {
     p = fract(p * vec2(123.34, 456.21));
     p += dot(p, p + 45.32);
@@ -39,38 +41,37 @@ void main() {
     vec2 uv = texCoord0;
     float t = GameTime;
 
-    // Slowly bending curtain; several noise scales prevent a regular barcode pattern.
-    float broadWarp = fbm(vec2(uv.x * 5.0 + t * 0.035, uv.y * 2.0 - t * 0.018));
-    float fineWarp = fbm(vec2(uv.x * 17.0 - t * 0.07, uv.y * 3.5 + t * 0.025));
+    // Circular domain keeps the procedural texture continuous at the ring seam.
+    float angle = uv.x * TAU;
+    vec2 ring = vec2(cos(angle), sin(angle));
+
+    // Smooth, slowly moving distortion at multiple scales.
+    float broadWarp = fbm(ring * 3.0 + vec2(t * 0.035, uv.y * 2.0 - t * 0.018));
+    float fineWarp = fbm(ring * 8.0 + vec2(-t * 0.07, uv.y * 3.5 + t * 0.025));
     float bend = (broadWarp - 0.45) * 0.16 + (fineWarp - 0.5) * 0.045;
 
-    float x = uv.x + bend;
-    float vertical = uv.y;
-
-    // Thin filaments nested inside a broad, soft aurora veil.
-    float veilNoise = fbm(vec2(x * 13.0 + t * 0.025, vertical * 3.0 - t * 0.02));
-    float filamentWave = 0.5 + 0.5 * sin((x * 92.0 + bend * 36.0 + t * 0.11) * 6.2831853);
-    float filaments = pow(max(filamentWave, 0.0), 7.0);
+    float veilNoise = fbm(ring * 7.0 + vec2(t * 0.025 + bend, uv.y * 3.0 - t * 0.02));
+    float filamentWave = 0.5 + 0.5 * sin((angle * 46.0 + bend * 18.0 + t * 0.11) * 6.2831853);
+    float filaments = pow(max(filamentWave, 0.0), 8.0);
     float wisps = smoothstep(0.34, 0.78, veilNoise);
-    float intensity = (0.16 + wisps * 0.30 + filaments * (0.20 + wisps * 0.65));
+    float intensity = 0.12 + wisps * 0.26 + filaments * (0.18 + wisps * 0.66);
 
-    // Soft fade at the top and bottom, with irregular upper and lower edges.
-    float edgeNoise = fbm(vec2(x * 8.0 + t * 0.02, 0.7));
-    float topEdge = 0.78 + (edgeNoise - 0.5) * 0.13;
+    // The top and bottom fade smoothly, with irregular edges instead of hard rectangles.
+    float edgeNoise = fbm(ring * 5.0 + vec2(t * 0.02, 0.7));
+    float topEdge = 0.80 + (edgeNoise - 0.5) * 0.14;
     float bottomEdge = 0.10 + (fineWarp - 0.5) * 0.10;
-    float verticalFade = smoothstep(bottomEdge, bottomEdge + 0.20, vertical)
-                       * (1.0 - smoothstep(topEdge - 0.14, topEdge + 0.04, vertical));
+    float verticalFade = smoothstep(bottomEdge, bottomEdge + 0.20, uv.y)
+                       * (1.0 - smoothstep(topEdge - 0.14, topEdge + 0.04, uv.y));
 
-    // Keep the glow luminous without filling the entire ribbon with opaque color.
     float alpha = clamp(intensity * verticalFade * 0.62 * vertexColor.a, 0.0, 0.72);
 
     vec3 cyan = vec3(0.08, 0.78, 0.72);
     vec3 green = vec3(0.16, 0.95, 0.48);
     vec3 pale = vec3(0.50, 0.98, 0.84);
-    float colorMix = clamp(0.25 + veilNoise * 0.70 + filaments * 0.18, 0.0, 1.0);
+    float colorMix = clamp(0.20 + veilNoise * 0.82 + filaments * 0.12, 0.0, 1.0);
     vec3 auroraColor = mix(cyan, green, colorMix);
-    auroraColor = mix(auroraColor, pale, clamp(filaments * 0.45, 0.0, 0.38));
+    auroraColor = mix(auroraColor, pale, clamp(filaments * 0.40, 0.0, 0.36));
 
-    // The JSON blend mode is additive (SRC_ALPHA, ONE).
+    // The core shader uses additive blending (SRC_ALPHA, ONE).
     fragColor = vec4(auroraColor, alpha);
 }

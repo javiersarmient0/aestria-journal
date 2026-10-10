@@ -25,6 +25,9 @@ public final class AuroraSkyRenderer {
     private static final double RADIUS = 180.0;
 
     private static ShaderProgram auroraShader;
+    private static net.minecraft.client.world.ClientWorld anchoredWorld;
+    private static double anchorX;
+    private static double anchorZ;
 
     private AuroraSkyRenderer() {
     }
@@ -51,6 +54,21 @@ public final class AuroraSkyRenderer {
 
         MatrixStack matrices = context.matrixStack();
         Matrix4f matrix = matrices.peek().getPositionMatrix();
+
+        // Keep the aurora anchored to a fixed point in world space for this world session.
+        // WorldRenderContext's matrix is camera-oriented, so submitted vertices must be
+        // expressed relative to the camera position rather than centered at (0, 0, 0).
+        var cameraPos = context.camera().getPos();
+        if (anchoredWorld != context.world()) {
+            anchoredWorld = context.world();
+            anchorX = Math.floor(cameraPos.x / 256.0 + 0.5) * 256.0;
+            anchorZ = Math.floor(cameraPos.z / 256.0 + 0.5) * 256.0;
+        }
+
+        double cameraX = cameraPos.x;
+        double cameraY = cameraPos.y;
+        double cameraZ = cameraPos.z;
+
         float time = (context.world().getTime()
                 + context.tickCounter().getTickDelta(true)) * 0.01F;
 
@@ -77,10 +95,10 @@ public final class AuroraSkyRenderer {
                 double a0 = u0 * Math.PI * 2.0;
                 double a1 = u1 * Math.PI * 2.0;
 
-                double x0 = Math.cos(a0) * RADIUS;
-                double z0 = Math.sin(a0) * RADIUS;
-                double x1 = Math.cos(a1) * RADIUS;
-                double z1 = Math.sin(a1) * RADIUS;
+                double x0 = anchorX + Math.cos(a0) * RADIUS - cameraX;
+                double z0 = anchorZ + Math.sin(a0) * RADIUS - cameraZ;
+                double x1 = anchorX + Math.cos(a1) * RADIUS - cameraX;
+                double z1 = anchorZ + Math.sin(a1) * RADIUS - cameraZ;
 
                 double top0 = 78.0
                         + 8.0 * Math.sin(a0 * 2.0 + time * 0.22)
@@ -96,10 +114,10 @@ public final class AuroraSkyRenderer {
                         + 3.0 * Math.sin(a1 * 7.0 + time * 0.11);
 
                 // UV.y = 0 at the base and 1 at the top.
-                vertex(buffer, matrix, x0, bottom0, z0, u0, 0.0F);
-                vertex(buffer, matrix, x0, top0, z0, u0, 1.0F);
-                vertex(buffer, matrix, x1, top1, z1, u1, 1.0F);
-                vertex(buffer, matrix, x1, bottom1, z1, u1, 0.0F);
+                vertex(buffer, matrix, x0, bottom0 - cameraY, z0, u0, 0.0F);
+                vertex(buffer, matrix, x0, top0 - cameraY, z0, u0, 1.0F);
+                vertex(buffer, matrix, x1, top1 - cameraY, z1, u1, 1.0F);
+                vertex(buffer, matrix, x1, bottom1 - cameraY, z1, u1, 0.0F);
             }
 
             BufferRenderer.drawWithGlobalProgram(buffer.end());

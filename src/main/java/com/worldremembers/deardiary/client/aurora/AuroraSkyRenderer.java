@@ -37,13 +37,11 @@ public final class AuroraSkyRenderer {
         }
 
         // Prototype is visible at night only, so it can be evaluated without a command.
-        float skyBrightness = 1.0F - context.world().getSkyAngle(context.tickCounter().getTickDelta(true));
         if (context.world().getDimension().hasFixedTime() || context.world().getTimeOfDay() % 24000L < 12500L) {
             return;
         }
 
         MatrixStack matrices = context.matrixStack();
-        Vec3d camera = context.camera().getPos();
         Matrix4f matrix = matrices.peek().getPositionMatrix();
         double time = (context.world().getTime() + context.tickCounter().getTickDelta(true)) * 0.018;
         float pulse = 0.78F + 0.22F * MathHelper.sin((float) (time * 0.7));
@@ -55,7 +53,7 @@ public final class AuroraSkyRenderer {
 
         BufferBuilder buffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
         for (int ribbon = 0; ribbon < RIBBONS; ribbon++) {
-            emitRibbon(buffer, matrix, camera, time, ribbon, pulse);
+            emitRibbon(buffer, matrix, time, ribbon, pulse);
         }
         BufferRenderer.drawWithGlobalProgram(buffer.end());
 
@@ -63,9 +61,9 @@ public final class AuroraSkyRenderer {
         RenderSystem.disableBlend();
     }
 
-    private static void emitRibbon(BufferBuilder buffer, Matrix4f matrix, Vec3d camera,
+    private static void emitRibbon(BufferBuilder buffer, Matrix4f matrix,
                                    double time, int ribbon, float pulse) {
-        double center = -1.05 + ribbon * 0.31;
+        double center = -0.35 + ribbon * 0.20;
         double width = 0.16 + 0.045 * Math.sin(ribbon * 1.7);
         double phase = ribbon * 1.13;
         int segments = SEGMENTS;

@@ -7,8 +7,6 @@ import com.worldremembers.deardiary.api.AestriaJournalApi;
 import com.worldremembers.deardiary.network.DearDiaryNetworking;
 import com.worldremembers.deardiary.storage.DiaryBackupManager;
 import com.worldremembers.deardiary.storage.JsonDiaryStorage;
-import com.worldremembers.deardiary.rift.RiftEvent;
-import com.worldremembers.deardiary.rift.RiftNetworking;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Files;
@@ -36,8 +34,6 @@ public final class DearDiaryMod implements ModInitializer {
         DearDiaryServices.setConfigManager(configManager);
 
         DearDiaryNetworking.register();
-        RiftNetworking.register();
-        RiftEvent.register();
         FabricCompatBootstrap.register();
         configManager.writeSupportFiles();
         AestriaJournalCommands.register();

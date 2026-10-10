@@ -1,0 +1,38 @@
+{
+  "blend": {
+    "func": "add",
+    "srcrgb": "srcalpha",
+    "dstrgb": "one",
+    "srcalpha": "one",
+    "dstalpha": "zero"
+  },
+  "vertex": "dear_diary:aurora",
+  "fragment": "dear_diary:aurora",
+  "attributes": ["Position", "UV0", "Color"],
+  "uniforms": [
+    {
+      "name": "InvProjMat",
+      "type": "matrix4x4",
+      "count": 16,
+      "values": [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+    },
+    {
+      "name": "CameraRotation",
+      "type": "matrix4x4",
+      "count": 16,
+      "values": [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+    },
+    {
+      "name": "CameraPos",
+      "type": "float",
+      "count": 3,
+      "values": [0.0, 64.0, 0.0]
+    },
+    {
+      "name": "GameTime",
+      "type": "float",
+      "count": 1,
+      "values": [0.0]
+    }
+  ]
+}
